@@ -1,0 +1,8 @@
+# 编译产物（由 build.cmd 生成）
+dist/
+
+# 运行时数据
+runtime/
+config.json
+*.log
+stop.flag
