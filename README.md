@@ -16,17 +16,17 @@
 2. 首次使用点 **添加代理**：输入代理客户端的核心进程名（通常为客户端名 + Core）→ 扫描端口 →
    勾选识别为 HTTP/SOCKS5 的端口 → 添加。
 3. 引擎每 60 秒测速一轮；发现更优链路（快 25% 以上且停留满 5 分钟）自动切换系统代理。
-4. 关闭窗口 = 最小化到托盘；**退出请用托盘图标右键 → 退出**（会写 stop.flag，
-   看门狗不再拉起）。
+4. 关闭窗口 = 最小化到托盘；**退出请用托盘图标右键 → 退出**（程序进程随之结束）。
 
-## 看门狗自恢复（推荐安装）
+## 开机自启
 
-双击 `install-watchdog.cmd`（无需管理员）：
-- 注册计划任务，每分钟检查一次，进程不在则自动拉起（用户主动退出除外）
-- 通过 `watchdog-silent.vbs`（wscript）静默运行，**不会弹出任何窗口**
-- 同时注册开机自启
+安装时已写入注册表自启项（`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`），
+登录后自动启动。管理方式：
 
-卸载：双击 `uninstall-watchdog.cmd`
+```
+添加/修改:  reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v ProxyDirector /t REG_SZ /d "\"<程序完整路径>\"" /f
+删除:       reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v ProxyDirector /f
+```
 
 ## 决策规则
 
@@ -71,14 +71,9 @@ build.cmd     # 调用 Windows 自带 .NET Framework 4.8 csc，无需安装任�
 ```
 src\ProxyDirector.cs     源码（单文件，C# 5 语法）
 build.cmd                编译脚本
-watchdog.cmd             看门狗检查脚本（由计划任务每分钟调用）
-watchdog-silent.vbs      静默启动层（wscript 无窗口运行 watchdog.cmd）
-install-watchdog.cmd     注册看门狗 + 开机自启
-uninstall-watchdog.cmd   卸载看门狗 + 自启
 dist\ProxyDirector.exe   编译产物
 dist\config.json         配置（首次运行自动生成）
 dist\proxy.log           运行日志（自动轮转）
-runtime\stop.flag        退出标志（存在时看门狗不拉起）
 ```
 
 ## 已知限制

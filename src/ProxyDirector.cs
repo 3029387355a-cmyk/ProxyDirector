@@ -68,7 +68,6 @@ namespace ProxyDirector
         public static readonly string BaseDir = AppDomain.CurrentDomain.BaseDirectory;
         public static readonly string ConfigPath = Path.Combine(BaseDir, "config.json");
         public static readonly string LogPath = Path.Combine(BaseDir, "proxy.log");
-        public static readonly string RuntimeDir = Path.Combine(BaseDir, "runtime");
 
         public static AppConfig Load()
         {
@@ -108,7 +107,6 @@ namespace ProxyDirector
         {
             try
             {
-                Directory.CreateDirectory(RuntimeDir);
                 JavaScriptSerializer js = new JavaScriptSerializer();
                 File.WriteAllText(ConfigPath, js.Serialize(cfg));
             }
@@ -1430,8 +1428,6 @@ namespace ProxyDirector
 
         public MainForm()
         {
-            // 启动清障: 删除 stop 标志 (看门狗依据)
-            try { Directory.CreateDirectory(ConfigStore.RuntimeDir); File.Delete(Path.Combine(ConfigStore.RuntimeDir, "stop.flag")); } catch { }
 
             _cfg = ConfigStore.Load();
             _engine = new Engine(_cfg);
@@ -1846,8 +1842,6 @@ namespace ProxyDirector
                 Hide();
                 return;
             }
-            // 退出: 写 stop 标志, 看门狗不再拉起
-            try { File.WriteAllText(Path.Combine(ConfigStore.RuntimeDir, "stop.flag"), DateTime.Now.ToString()); } catch { }
             _tray.Visible = false;
             _engine.Stop();
             Logger.Log("ProxyDirector 退出");
