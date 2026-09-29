@@ -126,7 +126,7 @@ namespace ProxyDirector
     public static class PortDiscovery
     {
         // 进程名前缀 -> 匹配进程家族监听的 TCP 端口列表 (含归属进程名)
-        // 输入 "代理客户端" 可同时覆盖 代理客户端.exe / 代理内核.exe / 代理客户端HelperService.exe;
+        // 输入客户端名可同时覆盖其全部进程 (UI / 内核 / 助手服务);
         // 非代理端口(如 HelperService 的 47890)由上层协议识别阶段排除。
         public static List<PortInfo> GetListeningPortInfos(string processNamePrefix)
         {
@@ -460,7 +460,7 @@ namespace ProxyDirector
 
         private void DetectExternalConflict()
         {
-            // 若系统代理开着但不是指向任何受管端口 => 可能是 代理客户端 的开关在抢
+            // 若系统代理开着但不是指向任何受管端口 => 可能是某代理客户端的开关在抢
             string cur = SystemProxy.GetCurrent();
             bool on = cur.StartsWith("[ON]");
             bool ours = false;
@@ -469,7 +469,7 @@ namespace ProxyDirector
             lock (_lock)
             {
                 if (on && !ours)
-                    _snap.externalConflict = "系统代理被外部程序设置为 " + cur.Substring(5) + "，请关闭 代理客户端 的系统代理开关";
+                    _snap.externalConflict = "系统代理被外部程序设置为 " + cur.Substring(5) + "，请关闭机场客户端的系统代理开关";
                 else
                     _snap.externalConflict = "";
             }
@@ -698,7 +698,7 @@ namespace ProxyDirector
             StartPosition = FormStartPosition.CenterParent;
             ClientSize = new Size(440, 380);
 
-            Label l1 = new Label(); l1.Text = "代理客户端核心进程名 (如 客户端核心进程):";
+            Label l1 = new Label(); l1.Text = "代理客户端核心进程名 (通常为 客户端名+Core):";
             l1.Location = new Point(12, 12); l1.AutoSize = true;
             Controls.Add(l1);
 
@@ -904,7 +904,7 @@ namespace ProxyDirector
             _saveBtn = MkBtn("保存设置", 460, 360, OnSaveSettings);
 
             Label note = new Label();
-            note.Text = "使用前提: 关闭 各代理客户端 客户端各自的\"系统代理\"开关, 由本工具独占管理系统代理。\n关闭窗口 = 最小化到托盘; 退出请用托盘图标右键 -> 退出。";
+            note.Text = "使用前提: 关闭各代理客户端的\"系统代理\"开关, 由本工具独占管理系统代理。\n关闭窗口 = 最小化到托盘; 退出请用托盘图标右键 -> 退出。";
             note.ForeColor = Color.DimGray; note.AutoSize = true; note.Location = new Point(12, 396);
             Controls.Add(note);
 
