@@ -632,7 +632,40 @@ namespace ProxyDirector
         public void ReloadConfig()
         {
             lock (_lock) { _cfg = ConfigStore.Load(); }
+            RebuildPlaceholderStates();
             DetectExternalConflict();
+        }
+
+        // 配置变更后立即重建展示行(不等测速): 删除的行消失, 新增的行显示"测速中", 禁用的显示"已禁用";
+        // 已有且地址未变的行保留原状态, 避免闪变。
+        public void RebuildPlaceholderStates()
+        {
+            lock (_lock)
+            {
+                List<ProxyState> old = _snap.states;
+                List<ProxyState> fresh = new List<ProxyState>();
+                foreach (ProxyEntry p in _cfg.proxies)
+                {
+                    ProxyState st = null;
+                    foreach (ProxyState o in old)
+                    {
+                        if (o.cfg.name != p.name) continue;
+                        // 地址/端口变了则旧状态作废, 视为新行
+                        st = (o.cfg.host == p.host && o.cfg.port == p.port) ? o : null;
+                        break;
+                    }
+                    if (st == null)
+                    {
+                        st = new ProxyState();
+                        st.linkOk = false;
+                        st.detail = p.enabled ? "测速中" : "已禁用";
+                    }
+                    st.cfg = p;   // 同步最新配置引用
+                    if (!p.enabled) { st.linkOk = false; st.detail = "已禁用"; }
+                    fresh.Add(st);
+                }
+                _snap.states = fresh;
+            }
         }
 
         // 供 UI 层同步当前配置引用 (修改属性后避免旧引用覆盖)
@@ -740,6 +773,9 @@ namespace ProxyDirector
 
         private void RunCheckInner()
         {
+            // 本轮开始: 先按配置重建行(新增的显示"测速中", 已删除的立即消失)
+            RebuildPlaceholderStates();
+
             List<ProxyState> states = new List<ProxyState>();
             foreach (ProxyEntry p in _cfg.proxies)
             {
@@ -751,6 +787,7 @@ namespace ProxyDirector
                     st.linkOk = false;
                     st.detail = "已禁用";
                     states.Add(st);
+                    PublishRow(st);
                     continue;
                 }
                 // 预热中: 不测速不统计, 占位展示
@@ -759,6 +796,7 @@ namespace ProxyDirector
                     st.linkOk = false;
                     st.detail = "预热中";
                     states.Add(st);
+                    PublishRow(st);
                     continue;
                 }
                 SpeedResult r = SpeedTester.Test(p.host, p.port, _cfg, p.testUrlOverride);
@@ -775,6 +813,8 @@ namespace ProxyDirector
                     ps.lastOk = DateTime.Now;
                 }
                 else ps.lastFail = DateTime.Now;
+                // 单行增量发布: 测完一个先刷一行, 不等整轮结束
+                PublishRow(st);
                 // 失败计数
                 if (!r.ok)
                 {
@@ -851,6 +891,19 @@ namespace ProxyDirector
             if (sum.Length == 0) sum.Append("(无已配置代理)");
             Logger.Log("测速汇总: " + sum + " | 决策: " + decisionInfo
                        + (_cfg.autoSwitch ? "" : " [自动切换暂停中]"));
+        }
+
+        // 单行增量发布: 测完一个就刷新对应展示行, 不必等整轮结束
+        private void PublishRow(ProxyState st)
+        {
+            lock (_lock)
+            {
+                for (int i = 0; i < _snap.states.Count; i++)
+                {
+                    if (_snap.states[i].cfg.name == st.cfg.name) { _snap.states[i] = st; break; }
+                }
+            }
+            FillStatsInto(st, st.cfg.name == _currentName);
         }
 
         private void FillStatsInto(ProxyState st, bool isActive)
@@ -1546,9 +1599,9 @@ namespace ProxyDirector
                 ProxyState st = s.states[i];
                 bool isCur = st.cfg.name == s.currentName;
                 bool warming = st.cfg.name == s.warmingName;
-                // 陈旧占位: 行数据还是上一轮的禁用/预热占位, 但开关已启用且新轮未完成 -> 显示中性"测速中"
+                // 待测状态: 行数据还是禁用/预热/未测的占位, 而开关已启用 -> 显示中性"测速中…"
                 bool stale = st.cfg.enabled && !warming && !st.linkOk
-                             && (st.detail == "已禁用" || st.detail == "预热中");
+                             && (st.detail == "已禁用" || st.detail == "预热中" || st.detail == "测速中");
                 it.SubItems[0].Text = !st.cfg.enabled ? "❌" : (isCur ? "●" : "");
                 it.SubItems[1].Text = st.cfg.name;
                 it.SubItems[2].Text = st.cfg.host + ":" + st.cfg.port;
@@ -1610,6 +1663,7 @@ namespace ProxyDirector
             if (pe == null) return;
             pe.enabled = !pe.enabled;
             ConfigStore.Save(_cfg);
+            _engine.RebuildPlaceholderStates();   // 立即反映启用/禁用状态
             Logger.Log("用户" + (pe.enabled ? "启用" : "禁用") + "代理: " + pe.name);
 
             if (!pe.enabled)
@@ -1683,21 +1737,23 @@ namespace ProxyDirector
             {
                 if (f.ShowDialog(this) == DialogResult.OK && f.Added.Count > 0)
                 {
+                    AppConfig cfg = _engine.Config;   // 始终操作引擎当前配置
+                    _cfg = cfg;
                     foreach (ProxyEntry pe in f.Added)
                     {
                         bool dup = false;
-                        foreach (ProxyEntry old in _cfg.proxies)
+                        foreach (ProxyEntry old in cfg.proxies)
                             if (old.port == pe.port && old.host == pe.host) { dup = true; break; }
                         if (!dup)
                         {
-                            _cfg.proxies.Add(pe);
+                            cfg.proxies.Add(pe);
                             Logger.Log("用户添加代理: " + pe.name + " (" + pe.host + ":" + pe.port + " " + pe.protocol
                                        + ", 进程=" + pe.processName + ")");
                         }
                         else Logger.Log("用户添加代理 " + pe.name + ": 端口已存在, 跳过");
                     }
-                    ConfigStore.Save(_cfg);
-                    _engine.ReloadConfig();
+                    ConfigStore.Save(cfg);
+                    _engine.RebuildPlaceholderStates();   // 立即显示新行(测速中), 不等整轮测速
                     _engine.ForceCheck();
                 }
             }
@@ -1705,17 +1761,20 @@ namespace ProxyDirector
 
         private void OnDel(object sender, EventArgs e)
         {
-            if (_lv.SelectedItems.Count == 0) { MessageBox.Show("请先选中一行"); return; }
-            string name = _lv.SelectedItems[0].SubItems[1].Text;
-            ProxyEntry dead = null;
-            foreach (ProxyEntry p in _cfg.proxies) if (p.name == name) { dead = p; break; }
-            if (dead != null)
-            {
-                _cfg.proxies.Remove(dead);
-                ConfigStore.Save(_cfg);
-                _engine.ReloadConfig();
-                Logger.Log("用户删除代理: " + name);
-            }
+            ProxyEntry dead = SelectedEntry();
+            if (dead == null) return;
+            if (MessageBox.Show("确定删除代理 \"" + dead.name + "\" ?\n\n删除后其统计信息一并清除。",
+                                "删除代理", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK)
+                return;
+
+            AppConfig cfg = _engine.Config;
+            cfg.proxies.Remove(dead);
+            ConfigStore.Save(cfg);
+            _cfg = cfg;
+            Logger.Log("用户删除代理: " + dead.name);
+            _engine.RebuildPlaceholderStates();   // 立即从列表移除
+            _engine.ForceCheck();
+            RefreshRowBtnStates();
         }
 
         private void OnRescan(object sender, EventArgs e)
