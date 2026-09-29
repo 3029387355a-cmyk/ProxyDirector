@@ -1272,8 +1272,8 @@ namespace ProxyDirector
                     try { start = p.StartTime.ToString("yyyy-MM-dd HH:mm:ss"); } catch { }
                     try { mem = (p.WorkingSet64 / 1024 / 1024) + " MB"; } catch { }
                     rows.Add(new string[] { "进程 [" + p.ProcessName + "]", "PID " + p.Id });
-                    rows.Add(new string[] { "    路径", path });
-                    rows.Add(new string[] { "    启动于", start + "    内存: " + mem });
+                    rows.Add(new string[] { "路径", path });
+                    rows.Add(new string[] { "启动于", start + "    内存: " + mem });
                 }
                 if (!any) rows.Add(new string[] { "进程", "未运行" });
                 foreach (PortInfo pi in PortDiscovery.GetListeningPortInfos(cfg.processName))
@@ -1289,10 +1289,7 @@ namespace ProxyDirector
         public static void AppendProcessInfo(StringBuilder sb, ProxyEntry cfg)
         {
             foreach (string[] row in ProcessRows(cfg))
-            {
-                if (row[0].StartsWith("    ")) sb.AppendLine("    " + row[0].TrimStart() + " : " + row[1]);
-                else sb.AppendLine("  " + row[0] + " : " + row[1]);
-            }
+                sb.AppendLine("  " + row[0] + " : " + row[1]);
         }
     }
 
