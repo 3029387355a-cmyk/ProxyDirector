@@ -623,35 +623,54 @@ namespace ProxyDirector
             get { lock (_lock) { return _cfg; } }
         }
 
-        // 对所有代理重新扫描端口并识别协议, 更新配置
-        public void RescanAll()
+        // 对所有代理重新扫描端口并识别协议, 更新配置; 返回每个代理的结果描述
+        public List<string> RescanAll()
         {
+            List<string> results = new List<string>();
             foreach (ProxyEntry p in _cfg.proxies)
             {
                 try
                 {
+                    int oldPort = p.port;
                     List<int> ports = PortDiscovery.GetListeningPorts(p.processName);
-                    if (ports.Count > 0)
+                    if (ports.Count == 0)
                     {
-                        int bestPort = 0; string bestProto = "UNKNOWN";
-                        foreach (int pt in ports)
-                        {
-                            string proto = ProtocolProbe.Identify(p.host, pt, _cfg.probeTimeoutMs);
-                            if (proto != "UNKNOWN") { bestPort = pt; bestProto = proto; break; }
-                        }
-                        if (bestPort != 0)
-                        {
-                            if (p.port != bestPort)
-                                Logger.Log("重新扫描: " + p.name + " 端口 " + p.port + " -> " + bestPort);
-                            p.port = bestPort;
-                            p.protocol = bestProto;
-                        }
+                        results.Add(p.name + ": 进程未运行或无监听 (保留端口 " + oldPort + ")");
+                        continue;
+                    }
+                    int bestPort = 0; string bestProto = "UNKNOWN";
+                    foreach (int pt in ports)
+                    {
+                        string proto = ProtocolProbe.Identify(p.host, pt, _cfg.probeTimeoutMs);
+                        if (proto != "UNKNOWN") { bestPort = pt; bestProto = proto; break; }
+                    }
+                    if (bestPort == 0)
+                    {
+                        results.Add(p.name + ": 未识别到代理端口 (保留端口 " + oldPort + ")");
+                        continue;
+                    }
+                    if (p.port != bestPort)
+                    {
+                        Logger.Log("重新扫描: " + p.name + " 端口 " + p.port + " -> " + bestPort);
+                        p.port = bestPort;
+                        p.protocol = bestProto;
+                        results.Add(p.name + ": 端口已更新 " + oldPort + " -> " + bestPort + " (" + bestProto + ")");
+                    }
+                    else
+                    {
+                        p.protocol = bestProto;
+                        results.Add(p.name + ": 端口不变 (" + bestPort + ", " + bestProto + ")");
                     }
                 }
-                catch (Exception ex) { Logger.Log("重新扫描异常[" + p.name + "]: " + ex.Message); }
+                catch (Exception ex)
+                {
+                    Logger.Log("重新扫描异常[" + p.name + "]: " + ex.Message);
+                    results.Add(p.name + ": 扫描异常 - " + ex.Message);
+                }
             }
             ConfigStore.Save(_cfg);
             ForceCheck();
+            return results;
         }
 
         // 手动切换
@@ -1570,8 +1589,27 @@ namespace ProxyDirector
         private void OnRescan(object sender, EventArgs e)
         {
             Logger.Log("用户触发重新扫描端口");
-            _engine.RescanAll();
-            MessageBox.Show("重新扫描完成, 结果见日志与列表");
+            _rescanBtn.Enabled = false;
+            UseWaitCursor = true;
+            ThreadPool.QueueUserWorkItem(delegate(object state)
+            {
+                List<string> results = _engine.RescanAll();
+                try
+                {
+                    BeginInvoke((MethodInvoker)delegate
+                    {
+                        if (IsDisposed) return;
+                        UseWaitCursor = false;
+                        _rescanBtn.Enabled = true;
+                        StringBuilder sb = new StringBuilder("重新扫描结果:\n\n");
+                        foreach (string r in results) sb.AppendLine(r);
+                        sb.AppendLine("\n已保存配置并触发立即测速。");
+                        MessageBox.Show(sb.ToString(), "重新扫描端口");
+                    });
+                }
+                catch (ObjectDisposedException) { }
+                catch (InvalidOperationException) { }
+            });
         }
 
         private void OnTestNow(object sender, EventArgs e)
