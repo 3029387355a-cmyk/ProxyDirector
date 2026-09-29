@@ -1547,18 +1547,23 @@ namespace ProxyDirector
                 ProxyState st = s.states[i];
                 bool isCur = st.cfg.name == s.currentName;
                 bool warming = st.cfg.name == s.warmingName;
+                // 陈旧占位: 行数据还是上一轮的禁用/预热占位, 但开关已启用且新轮未完成 -> 显示中性"测速中"
+                bool stale = st.cfg.enabled && !warming && !st.linkOk
+                             && (st.detail == "已禁用" || st.detail == "预热中");
                 it.SubItems[0].Text = !st.cfg.enabled ? "❌" : (isCur ? "●" : "");
                 it.SubItems[1].Text = st.cfg.name;
                 it.SubItems[2].Text = st.cfg.host + ":" + st.cfg.port;
                 it.SubItems[3].Text = st.cfg.protocol;
-                it.SubItems[4].Text = (!st.cfg.enabled || warming) ? "…" : (st.linkOk ? st.latencyMs + " ms" : "-");
+                it.SubItems[4].Text = (!st.cfg.enabled || warming || stale) ? "…" : (st.linkOk ? st.latencyMs + " ms" : "-");
                 it.SubItems[5].Text = !st.cfg.enabled ? "已禁用"
-                                     : (warming ? "预热中" : (st.linkOk ? "可用" : "不可用"));
+                                     : (warming ? "预热中"
+                                        : (st.linkOk ? "可用"
+                                           : (stale ? "测速中…" : "不可用")));
                 it.SubItems[6].Text = st.detail;
                 it.SubItems[7].Text = st.cfg.processName;
                 it.BackColor = (isCur && st.cfg.enabled) ? Color.FromArgb(220, 240, 220) : SystemColors.Window;
                 it.ForeColor = !st.cfg.enabled ? Color.Gray
-                               : (warming ? Color.DarkOrange
+                               : (warming || stale ? Color.DarkOrange
                                   : (st.linkOk ? SystemColors.WindowText : Color.Firebrick));
             }
             _lv.EndUpdate();
