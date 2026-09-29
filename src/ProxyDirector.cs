@@ -1419,7 +1419,7 @@ namespace ProxyDirector
             _delBtn = MkBtn("删除所选", 112, 316, OnDel);
             _rescanBtn = MkBtn("重新扫描端口", 212, 316, OnRescan);
             _testBtn = MkBtn("立即测速", 332, 316, OnTestNow);
-            _switchBtn = MkBtn("手动切到此行", 432, 316, OnManualSwitch);
+            _switchBtn = MkBtn("切到此代理", 432, 316, OnManualSwitch);
             _pauseBtn = MkBtn("暂停自动切换", 552, 316, OnPauseToggle);
             _detailBtn = MkBtn("详细属性", 12, 350, OnDetail);
             _editBtn = MkBtn("修改属性", 112, 350, OnEditProp);
@@ -1427,7 +1427,7 @@ namespace ProxyDirector
 
             // 列表右键菜单
             ContextMenu cm = new ContextMenu();
-            MenuItem miSwitch = new MenuItem("切到此行", delegate(object s, EventArgs e) { OnManualSwitch(null, null); });
+            MenuItem miSwitch = new MenuItem("切到此代理", delegate(object s, EventArgs e) { OnManualSwitch(null, null); });
             cm.MenuItems.Add(miSwitch);
             MenuItem miToggle = new MenuItem("禁用", delegate(object s, EventArgs e) { OnToggleEnable(null, null); });
             cm.MenuItems.Add(miToggle);
