@@ -687,6 +687,7 @@ namespace ProxyDirector
         private TextBox _nameBox;
         private Button _okBtn, _cancelBtn;
         private Label _hint;
+        private ProgressBar _progress;   // 扫描期间的滚动加载动画
         public List<ProxyEntry> Added = new List<ProxyEntry>();
 
         public AddProxyForm()
@@ -714,6 +715,14 @@ namespace ProxyDirector
             _hint.Location = new Point(12, 64); _hint.AutoSize = true;
             Controls.Add(_hint);
 
+            _progress = new ProgressBar();
+            _progress.Style = ProgressBarStyle.Marquee;
+            _progress.MarqueeAnimationSpeed = 40;
+            _progress.Location = new Point(12, 62);
+            _progress.Size = new Size(408, 18);
+            _progress.Visible = false;
+            Controls.Add(_progress);
+
             _candList = new CheckedListBox();
             _candList.Location = new Point(12, 82); _candList.Size = new Size(408, 180);
             _candList.CheckOnClick = true;
@@ -734,25 +743,61 @@ namespace ProxyDirector
 
         private void OnScan(object sender, EventArgs e)
         {
-            _candList.Items.Clear();
             string proc = _procBox.Text.Trim();
             if (proc.Length == 0) { MessageBox.Show("请输入进程名"); return; }
-            List<PortInfo> ports = PortDiscovery.GetListeningPortInfos(proc);
-            if (ports.Count == 0)
+
+            // 进入扫描状态: 动画 + 禁用按钮, 实际工作放后台线程避免界面冻结
+            _candList.Items.Clear();
+            _candList.Items.Add("正在扫描端口并识别协议, 请稍候...", false);
+            _scanBtn.Enabled = false;
+            _okBtn.Enabled = false;
+            _hint.Visible = false;
+            _progress.Visible = true;
+            UseWaitCursor = true;
+
+            ThreadPool.QueueUserWorkItem(delegate(object state)
             {
-                _candList.Items.Add("未找到该进程监听的端口 (客户端未运行?)", false);
-                return;
-            }
-            foreach (PortInfo pi in ports)
-            {
-                string proto = ProtocolProbe.Identify("127.0.0.1", pi.port, 800);
-                string label = pi.port + "  —  " + (proto == "UNKNOWN" ? "非代理端口" : proto + " 代理")
-                             + "  [" + pi.owner + "]";
-                _candList.Items.Add(label, false);
-                // 存 port 到 item 的 tag 不方便, 用并行列表
-                _portMap[label] = pi.port; _protoMap[label] = proto;
-            }
-            if (_nameBox.Text.Length == 0) _nameBox.Text = proc;
+                // 后台: 端口发现 + 逐端口协议握手
+                List<PortInfo> ports = PortDiscovery.GetListeningPortInfos(proc);
+                List<int> portList = new List<int>();
+                List<string> protoList = new List<string>();
+                List<string> ownerList = new List<string>();
+                foreach (PortInfo pi in ports)
+                {
+                    string proto = ProtocolProbe.Identify("127.0.0.1", pi.port, 800);
+                    portList.Add(pi.port); protoList.Add(proto); ownerList.Add(pi.owner);
+                }
+                try
+                {
+                    BeginInvoke((MethodInvoker)delegate
+                    {
+                        if (IsDisposed) return;
+                        _progress.Visible = false;
+                        _hint.Visible = true;
+                        UseWaitCursor = false;
+                        _scanBtn.Enabled = true;
+                        _okBtn.Enabled = true;
+                        _candList.Items.Clear();
+                        _portMap.Clear(); _protoMap.Clear();
+                        if (portList.Count == 0)
+                        {
+                            _candList.Items.Add("未找到该进程监听的端口 (客户端未运行?)", false);
+                            return;
+                        }
+                        for (int i = 0; i < portList.Count; i++)
+                        {
+                            int pt = portList[i]; string proto = protoList[i]; string owner = ownerList[i];
+                            string label = pt + "  —  " + (proto == "UNKNOWN" ? "非代理端口" : proto + " 代理")
+                                         + "  [" + owner + "]";
+                            _candList.Items.Add(label, false);
+                            _portMap[label] = pt; _protoMap[label] = proto;
+                        }
+                        if (_nameBox.Text.Length == 0) _nameBox.Text = proc;
+                    });
+                }
+                catch (ObjectDisposedException) { }
+                catch (InvalidOperationException) { }
+            });
         }
 
         private Dictionary<string, int> _portMap = new Dictionary<string, int>();

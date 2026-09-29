@@ -23,6 +23,7 @@
 
 双击 `install-watchdog.cmd`（无需管理员）：
 - 注册计划任务，每分钟检查一次，进程不在则自动拉起（用户主动退出除外）
+- 通过 `watchdog-silent.vbs`（wscript）静默运行，**不会弹出任何窗口**
 - 同时注册开机自启
 
 卸载：双击 `uninstall-watchdog.cmd`
@@ -64,6 +65,7 @@ build.cmd     # 调用 Windows 自带 .NET Framework 4.8 csc，无需安装任�
 src\ProxyDirector.cs     源码（单文件，C# 5 语法）
 build.cmd                编译脚本
 watchdog.cmd             看门狗检查脚本（由计划任务每分钟调用）
+watchdog-silent.vbs      静默启动层（wscript 无窗口运行 watchdog.cmd）
 install-watchdog.cmd     注册看门狗 + 开机自启
 uninstall-watchdog.cmd   卸载看门狗 + 自启
 dist\ProxyDirector.exe   编译产物
