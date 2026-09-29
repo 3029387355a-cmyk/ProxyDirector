@@ -1578,7 +1578,8 @@ namespace ProxyDirector
             return null;
         }
 
-        // 禁用/启用当前选中行; 禁用当前生效者时立即切到最快可用链路
+        // 禁用/启用当前选中行; 禁用当前生效者时立即切到最快可用链路;
+        // 启用时先后台预热链路再正式测速, 避免闲置后冷启动导致首轮误报"不可用"
         private void OnToggleEnable(object sender, EventArgs e)
         {
             ProxyEntry pe = SelectedEntry();
@@ -1606,8 +1607,20 @@ namespace ProxyDirector
                     }
                     else Logger.Log("警告: 禁用 " + pe.name + " 后无可用代理, 系统代理保持原指向");
                 }
+                _engine.ForceCheck();
             }
-            _engine.ForceCheck();
+            else
+            {
+                // 启用: 预热(不计统计)完成后才触发正式测速
+                string warmName = pe.name, warmHost = pe.host, warmUrl = pe.testUrlOverride;
+                int warmPort = pe.port;
+                ThreadPool.QueueUserWorkItem(delegate(object state)
+                {
+                    SpeedResult wr = SpeedTester.Test(warmHost, warmPort, _engine.Config, warmUrl);
+                    Logger.Log("预热 " + warmName + ": " + (wr.ok ? wr.latencyMs + "ms, 链路已就绪" : "仍不可用"));
+                    _engine.ForceCheck();
+                });
+            }
             RefreshRowBtnStates();
         }
 
