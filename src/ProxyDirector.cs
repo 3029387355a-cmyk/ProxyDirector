@@ -445,6 +445,7 @@ namespace ProxyDirector
         private string _currentName = "";
         private DateTime _lastSwitch = DateTime.MinValue;
         private Dictionary<string, int> _failStreak = new Dictionary<string, int>();
+        private Dictionary<string, bool> _lastLinkOk = new Dictionary<string, bool>();
 
         public Engine(AppConfig cfg)
         {
@@ -612,6 +613,13 @@ namespace ProxyDirector
 
         public void RunCheck()
         {
+            // 顶层保护: 引擎线程任何异常都不允许终止循环
+            try { RunCheckInner(); }
+            catch (Exception ex) { Logger.Log("引擎轮次异常: " + ex); }
+        }
+
+        private void RunCheckInner()
+        {
             List<ProxyState> states = new List<ProxyState>();
             foreach (ProxyEntry p in _cfg.proxies)
             {
@@ -657,7 +665,7 @@ namespace ProxyDirector
                         _lastSwitch = DateTime.Now;
                         _snap.lastSwitchInfo = DateTime.Now.ToString("HH:mm:ss") + " -> " + target.name + " (" + d.reason + ")";
                     }
-                    Logger.Log("自动切换 -> " + target.name + " | " + d.reason);
+                    Logger.Log("自动切换 -> " + target.name + " | " + d.reason + " | 切换后系统代理: " + SystemProxy.GetCurrent());
                 }
             }
 
@@ -669,6 +677,28 @@ namespace ProxyDirector
                 _snap.autoSwitch = _cfg.autoSwitch;
                 _snap.sysProxy = SystemProxy.GetCurrent();
             }
+
+            // ---- 运行日志: 链路状态变化 + 本轮汇总 ----
+            foreach (ProxyState st in states)
+            {
+                bool prev;
+                if (_lastLinkOk.TryGetValue(st.cfg.name, out prev))
+                {
+                    if (prev != st.linkOk)
+                        Logger.Log("链路变化: " + st.cfg.name + " " + (prev ? "可用" : "不可用")
+                                   + " -> " + (st.linkOk ? "可用" : "不可用"));
+                }
+                _lastLinkOk[st.cfg.name] = st.linkOk;
+            }
+            StringBuilder sum = new StringBuilder();
+            foreach (ProxyState st in states)
+            {
+                if (sum.Length > 0) sum.Append(" | ");
+                sum.Append(st.cfg.name + "=" + (st.linkOk ? st.latencyMs + "ms" : "不可用"));
+            }
+            if (sum.Length == 0) sum.Append("(无已配置代理)");
+            Logger.Log("测速汇总: " + sum + " | 决策: " + decisionInfo
+                       + (_cfg.autoSwitch ? "" : " [自动切换暂停中]"));
         }
 
         private static string ShortUrl(string u)
@@ -792,6 +822,8 @@ namespace ProxyDirector
                             _candList.Items.Add(label, false);
                             _portMap[label] = pt; _protoMap[label] = proto;
                         }
+                        Logger.Log("端口扫描[" + proc + "]: " + _candList.Items.Count + " 个候选, 其中代理端口 "
+                                   + CountProxyPorts(portList, protoList));
                         if (_nameBox.Text.Length == 0) _nameBox.Text = proc;
                     });
                 }
@@ -802,6 +834,18 @@ namespace ProxyDirector
 
         private Dictionary<string, int> _portMap = new Dictionary<string, int>();
         private Dictionary<string, string> _protoMap = new Dictionary<string, string>();
+
+        private static string CountProxyPorts(List<int> ports, List<string> protos)
+        {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < ports.Count; i++)
+            {
+                if (protos[i] == "UNKNOWN") continue;
+                if (sb.Length > 0) sb.Append(", ");
+                sb.Append(ports[i] + "/" + protos[i]);
+            }
+            return sb.Length > 0 ? sb.ToString() : "(无)";
+        }
 
         private void OnOk(object sender, EventArgs e)
         {
@@ -902,6 +946,7 @@ namespace ProxyDirector
             _dwellNum.Minimum = 1; _dwellNum.Maximum = 120; Controls.Add(_dwellNum);
 
             _saveBtn = MkBtn("保存设置", 460, 360, OnSaveSettings);
+            MkBtn("打开日志", 560, 360, OnOpenLog);
 
             Label note = new Label();
             note.Text = "使用前提: 关闭各代理客户端的\"系统代理\"开关, 由本工具独占管理系统代理。\n关闭窗口 = 最小化到托盘; 退出请用托盘图标右键 -> 退出。";
@@ -1015,7 +1060,13 @@ namespace ProxyDirector
                         bool dup = false;
                         foreach (ProxyEntry old in _cfg.proxies)
                             if (old.port == pe.port && old.host == pe.host) { dup = true; break; }
-                        if (!dup) _cfg.proxies.Add(pe);
+                        if (!dup)
+                        {
+                            _cfg.proxies.Add(pe);
+                            Logger.Log("用户添加代理: " + pe.name + " (" + pe.host + ":" + pe.port + " " + pe.protocol
+                                       + ", 进程=" + pe.processName + ")");
+                        }
+                        else Logger.Log("用户添加代理 " + pe.name + ": 端口已存在, 跳过");
                     }
                     ConfigStore.Save(_cfg);
                     _engine.ReloadConfig();
@@ -1035,16 +1086,22 @@ namespace ProxyDirector
                 _cfg.proxies.Remove(dead);
                 ConfigStore.Save(_cfg);
                 _engine.ReloadConfig();
+                Logger.Log("用户删除代理: " + name);
             }
         }
 
         private void OnRescan(object sender, EventArgs e)
         {
+            Logger.Log("用户触发重新扫描端口");
             _engine.RescanAll();
             MessageBox.Show("重新扫描完成, 结果见日志与列表");
         }
 
-        private void OnTestNow(object sender, EventArgs e) { _engine.ForceCheck(); }
+        private void OnTestNow(object sender, EventArgs e)
+        {
+            Logger.Log("用户触发立即测速");
+            _engine.ForceCheck();
+        }
 
         private void OnManualSwitch(object sender, EventArgs e)
         {
@@ -1063,7 +1120,15 @@ namespace ProxyDirector
         private void OnSaveSettings(object sender, EventArgs e)
         {
             _engine.UpdateSettings((int)_intervalNum.Value, (int)_thresholdNum.Value, (int)_dwellNum.Value);
+            Logger.Log("用户保存设置: 周期=" + (int)_intervalNum.Value + "s 阈值="
+                       + (int)_thresholdNum.Value + "% 停留=" + (int)_dwellNum.Value + "分");
             MessageBox.Show("设置已保存");
+        }
+
+        private void OnOpenLog(object sender, EventArgs e)
+        {
+            try { Process.Start("notepad.exe", ConfigStore.LogPath); }
+            catch (Exception ex) { MessageBox.Show("打开日志失败: " + ex.Message); }
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)
