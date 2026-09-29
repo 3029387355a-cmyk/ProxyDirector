@@ -20,8 +20,11 @@
 
 ## 开机自启
 
-安装时已写入注册表自启项（`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`），
-登录后自动启动。管理方式：
+界面设置区有 **“开机自启”** 复选框，勾选即写入注册表自启项，取消即删除——
+程序启动时会读取注册表显示真实状态（注册表为唯一事实来源）。
+
+对应注册表项：`HKCU\Software\Microsoft\Windows\CurrentVersion\Run` 下的 `ProxyDirector` 值。
+需要手工管理时：
 
 ```
 添加/修改:  reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v ProxyDirector /t REG_SZ /d "\"<程序完整路径>\"" /f

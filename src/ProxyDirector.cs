@@ -1419,6 +1419,7 @@ namespace ProxyDirector
         private ListView _lv;
         private Button _addBtn, _delBtn, _rescanBtn, _testBtn, _pauseBtn, _switchBtn, _toggleBtn;
         private NumericUpDown _intervalNum, _thresholdNum, _dwellNum;
+        private CheckBox _autostartBox;
         private Button _saveBtn;
         private StatusStrip _status;
         private ToolStripStatusLabel _stCurrent, _stNext, _stDecision, _stSys;
@@ -1515,6 +1516,15 @@ namespace ProxyDirector
 
             _saveBtn = MkBtn("保存设置", 460, 354, OnSaveSettings);
             MkBtn("打开日志", 560, 354, OnOpenLog);
+
+            // 开机自启开关 (注册表 Run 项为唯一事实来源, 启动时读实际状态)
+            _autostartBox = new CheckBox();
+            _autostartBox.Text = "开机自启";
+            _autostartBox.AutoSize = true;
+            _autostartBox.Location = new Point(672, 360);
+            _autostartBox.Checked = IsAutostartEnabled();
+            _autostartBox.CheckedChanged += OnAutostartToggle;
+            Controls.Add(_autostartBox);
 
             Label note = new Label();
             note.Text = "使用前提: 关闭各代理客户端的\"系统代理\"开关, 由本工具独占管理系统代理。 关闭窗口 = 最小化到托盘; 退出请用托盘图标右键 -> 退出。\n行级操作(切到/禁用/删除/详细属性/修改属性)请先选中列表行, 或使用右键菜单。";
@@ -1831,6 +1841,60 @@ namespace ProxyDirector
         {
             try { Process.Start("notepad.exe", ConfigStore.LogPath); }
             catch (Exception ex) { MessageBox.Show("打开日志失败: " + ex.Message); }
+        }
+
+        // ---- 开机自启: 直接读写 HKCU Run 项, 注册表即状态 ----
+        private const string AutostartKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
+        private const string AutostartValueName = "ProxyDirector";
+
+        private static string CurrentExePath()
+        {
+            try
+            {
+                string p = System.Reflection.Assembly.GetExecutingAssembly().Location;
+                if (!string.IsNullOrEmpty(p)) return p;
+            }
+            catch { }
+            return Application.ExecutablePath;
+        }
+
+        private static bool IsAutostartEnabled()
+        {
+            try
+            {
+                using (RegistryKey k = Registry.CurrentUser.OpenSubKey(AutostartKeyPath, false))
+                {
+                    if (k == null) return false;
+                    string v = k.GetValue(AutostartValueName) as string;
+                    return !string.IsNullOrEmpty(v);
+                }
+            }
+            catch { return false; }
+        }
+
+        private static void SetAutostart(bool on)
+        {
+            using (RegistryKey k = Registry.CurrentUser.CreateSubKey(AutostartKeyPath))
+            {
+                if (k == null) throw new InvalidOperationException("无法打开注册表自启项");
+                if (on) k.SetValue(AutostartValueName, "\"" + CurrentExePath() + "\"", RegistryValueKind.String);
+                else k.DeleteValue(AutostartValueName, false);
+            }
+        }
+
+        private void OnAutostartToggle(object sender, EventArgs e)
+        {
+            try
+            {
+                SetAutostart(_autostartBox.Checked);
+                Logger.Log("用户" + (_autostartBox.Checked ? "开启" : "关闭") + "开机自启 (程序路径: "
+                           + CurrentExePath() + ")");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("设置开机自启失败: " + ex.Message);
+                _autostartBox.Checked = IsAutostartEnabled();   // 失败则回滚显示
+            }
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)
