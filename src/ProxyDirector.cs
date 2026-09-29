@@ -953,21 +953,44 @@ namespace ProxyDirector
         private void OnUiTick(object sender, EventArgs e)
         {
             EngineSnapshot s = _engine.Snapshot;
+
             _lv.BeginUpdate();
-            _lv.Items.Clear();
-            foreach (ProxyState st in s.states)
+            // 行集合只在代理增删/顺序变化时重建; 每秒仅原地更新单元格, 保留选中/焦点/滚动状态
+            bool rebuild = _lv.Items.Count != s.states.Count;
+            if (!rebuild)
             {
-                ListViewItem it = new ListViewItem(st.cfg.name == s.currentName ? "●" : "");
-                it.SubItems.Add(st.cfg.name);
-                it.SubItems.Add(st.cfg.host + ":" + st.cfg.port);
-                it.SubItems.Add(st.cfg.protocol);
-                it.SubItems.Add(st.linkOk ? st.latencyMs + " ms" : "-");
-                it.SubItems.Add(st.linkOk ? "可用" : "不可用");
-                it.SubItems.Add(st.detail);
-                it.SubItems.Add(st.cfg.processName);
-                if (st.cfg.name == s.currentName) it.BackColor = Color.FromArgb(220, 240, 220);
-                if (!st.linkOk) it.ForeColor = Color.Firebrick;
-                _lv.Items.Add(it);
+                for (int i = 0; i < s.states.Count; i++)
+                {
+                    if ((string)_lv.Items[i].Tag != s.states[i].cfg.name) { rebuild = true; break; }
+                }
+            }
+            if (rebuild)
+            {
+                _lv.Items.Clear();
+                foreach (ProxyState st in s.states)
+                {
+                    ListViewItem it = new ListViewItem();
+                    it.Tag = st.cfg.name;
+                    for (int k = 0; k < 7; k++) it.SubItems.Add("");
+                    _lv.Items.Add(it);
+                }
+            }
+
+            for (int i = 0; i < s.states.Count; i++)
+            {
+                ListViewItem it = _lv.Items[i];
+                ProxyState st = s.states[i];
+                bool isCur = st.cfg.name == s.currentName;
+                it.SubItems[0].Text = isCur ? "●" : "";
+                it.SubItems[1].Text = st.cfg.name;
+                it.SubItems[2].Text = st.cfg.host + ":" + st.cfg.port;
+                it.SubItems[3].Text = st.cfg.protocol;
+                it.SubItems[4].Text = st.linkOk ? st.latencyMs + " ms" : "-";
+                it.SubItems[5].Text = st.linkOk ? "可用" : "不可用";
+                it.SubItems[6].Text = st.detail;
+                it.SubItems[7].Text = st.cfg.processName;
+                it.BackColor = isCur ? Color.FromArgb(220, 240, 220) : SystemColors.Window;
+                it.ForeColor = st.linkOk ? SystemColors.WindowText : Color.Firebrick;
             }
             _lv.EndUpdate();
 
