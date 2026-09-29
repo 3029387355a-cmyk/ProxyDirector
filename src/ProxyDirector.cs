@@ -479,6 +479,7 @@ namespace ProxyDirector
         public bool autoSwitch;
         public string sysProxy = "";
         public string externalConflict = "";
+        public string warmingName = "";   // 正在预热的代理(空=无)
     }
 
     public class Engine
@@ -494,6 +495,13 @@ namespace ProxyDirector
         private Dictionary<string, int> _failStreak = new Dictionary<string, int>();
         private Dictionary<string, bool> _lastLinkOk = new Dictionary<string, bool>();
         private Dictionary<string, ProxyStats> _stats = new Dictionary<string, ProxyStats>();
+        private volatile string _warming = "";   // 正在预热的代理名, 空表示无
+
+        // 标记/清除预热状态(启用后焐热链路期间, UI 与引擎均按"预热中"处理)
+        public void SetWarming(string name)
+        {
+            _warming = name == null ? "" : name;
+        }
 
         private ProxyStats GetStats(string name)
         {
@@ -572,6 +580,7 @@ namespace ProxyDirector
             s.autoSwitch = _snap.autoSwitch;
             s.sysProxy = _snap.sysProxy;
             s.externalConflict = _snap.externalConflict;
+            s.warmingName = _warming;
             foreach (ProxyState st in _snap.states)
             {
                 ProxyState c = new ProxyState();
@@ -744,6 +753,14 @@ namespace ProxyDirector
                     states.Add(st);
                     continue;
                 }
+                // 预热中: 不测速不统计, 占位展示
+                if (p.name == _warming)
+                {
+                    st.linkOk = false;
+                    st.detail = "预热中";
+                    states.Add(st);
+                    continue;
+                }
                 SpeedResult r = SpeedTester.Test(p.host, p.port, _cfg, p.testUrlOverride);
                 st.linkOk = r.ok;
                 st.latencyMs = r.latencyMs;
@@ -813,7 +830,7 @@ namespace ProxyDirector
             // ---- 运行日志: 链路状态变化 + 本轮汇总 ----
             foreach (ProxyState st in states)
             {
-                if (!st.cfg.enabled) { _lastLinkOk.Remove(st.cfg.name); continue; }
+                if (!st.cfg.enabled || st.cfg.name == _warming) { _lastLinkOk.Remove(st.cfg.name); continue; }
                 bool prev;
                 if (_lastLinkOk.TryGetValue(st.cfg.name, out prev))
                 {
@@ -828,6 +845,7 @@ namespace ProxyDirector
             {
                 if (sum.Length > 0) sum.Append(" | ");
                 if (!st.cfg.enabled) sum.Append(st.cfg.name + "=已禁用");
+                else if (st.cfg.name == _warming) sum.Append(st.cfg.name + "=预热中");
                 else sum.Append(st.cfg.name + "=" + (st.linkOk ? st.latencyMs + "ms" : "不可用"));
             }
             if (sum.Length == 0) sum.Append("(无已配置代理)");
@@ -1528,16 +1546,20 @@ namespace ProxyDirector
                 ListViewItem it = _lv.Items[i];
                 ProxyState st = s.states[i];
                 bool isCur = st.cfg.name == s.currentName;
+                bool warming = st.cfg.name == s.warmingName;
                 it.SubItems[0].Text = !st.cfg.enabled ? "❌" : (isCur ? "●" : "");
                 it.SubItems[1].Text = st.cfg.name;
                 it.SubItems[2].Text = st.cfg.host + ":" + st.cfg.port;
                 it.SubItems[3].Text = st.cfg.protocol;
-                it.SubItems[4].Text = st.linkOk ? st.latencyMs + " ms" : "-";
-                it.SubItems[5].Text = !st.cfg.enabled ? "已禁用" : (st.linkOk ? "可用" : "不可用");
+                it.SubItems[4].Text = (!st.cfg.enabled || warming) ? "…" : (st.linkOk ? st.latencyMs + " ms" : "-");
+                it.SubItems[5].Text = !st.cfg.enabled ? "已禁用"
+                                     : (warming ? "预热中" : (st.linkOk ? "可用" : "不可用"));
                 it.SubItems[6].Text = st.detail;
                 it.SubItems[7].Text = st.cfg.processName;
                 it.BackColor = (isCur && st.cfg.enabled) ? Color.FromArgb(220, 240, 220) : SystemColors.Window;
-                it.ForeColor = !st.cfg.enabled ? Color.Gray : (st.linkOk ? SystemColors.WindowText : Color.Firebrick);
+                it.ForeColor = !st.cfg.enabled ? Color.Gray
+                               : (warming ? Color.DarkOrange
+                                  : (st.linkOk ? SystemColors.WindowText : Color.Firebrick));
             }
             _lv.EndUpdate();
 
@@ -1611,12 +1633,14 @@ namespace ProxyDirector
             }
             else
             {
-                // 启用: 预热(不计统计)完成后才触发正式测速
+                // 启用: 标记预热状态 -> 预热(不计统计)完成 -> 解除标记并触发正式测速
                 string warmName = pe.name, warmHost = pe.host, warmUrl = pe.testUrlOverride;
                 int warmPort = pe.port;
+                _engine.SetWarming(warmName);
                 ThreadPool.QueueUserWorkItem(delegate(object state)
                 {
                     SpeedResult wr = SpeedTester.Test(warmHost, warmPort, _engine.Config, warmUrl);
+                    _engine.SetWarming(null);
                     Logger.Log("预热 " + warmName + ": " + (wr.ok ? wr.latencyMs + "ms, 链路已就绪" : "仍不可用"));
                     _engine.ForceCheck();
                 });
