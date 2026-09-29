@@ -1377,11 +1377,23 @@ namespace ProxyDirector
             _editBtn = MkBtn("修改属性", 112, 350, OnEditProp);
 
             // 列表右键菜单
-            _lv.ContextMenu = new ContextMenu(new MenuItem[] {
-                new MenuItem("详细属性", delegate(object s, EventArgs e) { OnDetail(null, null); }),
-                new MenuItem("修改属性", delegate(object s, EventArgs e) { OnEditProp(null, null); }),
-                new MenuItem("删除", delegate(object s, EventArgs e) { OnDel(null, null); })
-            });
+            ContextMenu cm = new ContextMenu();
+            MenuItem miSwitch = new MenuItem("切到此行", delegate(object s, EventArgs e) { OnManualSwitch(null, null); });
+            cm.MenuItems.Add(miSwitch);
+            cm.MenuItems.Add(new MenuItem("立即测速", delegate(object s, EventArgs e) { OnTestNow(null, null); }));
+            cm.MenuItems.Add(new MenuItem("扫描端口", delegate(object s, EventArgs e) { OnRescan(null, null); }));
+            cm.MenuItems.Add(new MenuItem("-"));
+            MenuItem miDetail = new MenuItem("详细属性", delegate(object s, EventArgs e) { OnDetail(null, null); });
+            MenuItem miEdit = new MenuItem("修改属性", delegate(object s, EventArgs e) { OnEditProp(null, null); });
+            MenuItem miDel = new MenuItem("删除", delegate(object s, EventArgs e) { OnDel(null, null); });
+            cm.MenuItems.Add(miDetail); cm.MenuItems.Add(miEdit); cm.MenuItems.Add(miDel);
+            // 弹出时行级项跟随选中状态置灰
+            cm.Popup += delegate
+            {
+                bool has = _lv.SelectedItems.Count > 0;
+                miSwitch.Enabled = has; miDetail.Enabled = has; miEdit.Enabled = has; miDel.Enabled = has;
+            };
+            _lv.ContextMenu = cm;
 
             // 未选中行时行级操作按钮置灰
             _lv.SelectedIndexChanged += delegate { RefreshRowBtnStates(); };
