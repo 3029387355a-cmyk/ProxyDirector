@@ -1085,7 +1085,7 @@ namespace ProxyDirector
     {
         private Engine _engine;
         private string _name;
-        private ListView _lv;
+        private GroupBox _gBasic, _gProc, _gStat;
         private Button _refreshBtn, _closeBtn;
 
         public DetailProxyForm(Engine engine, string proxyName)
@@ -1096,36 +1096,44 @@ namespace ProxyDirector
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false; MinimizeBox = false;
             StartPosition = FormStartPosition.CenterParent;
-            ClientSize = new Size(600, 522);
 
-            // Windows 属性页样式: 分组 + 属性/值 两列
-            _lv = new ListView();
-            _lv.View = View.Details;
-            _lv.FullRowSelect = true;
-            _lv.GridLines = true;
-            _lv.Location = new Point(12, 12);
-            _lv.Size = new Size(576, 452);
-            _lv.Columns.Add("属性", 168);
-            _lv.Columns.Add("值", 388);
-            Controls.Add(_lv);
+            // Windows 属性页样式: 分组框 + 左对齐标签, 无背景色, 统一字体
+            _gBasic = new GroupBox(); _gBasic.Text = "基本信息";
+            _gBasic.Location = new Point(12, 12); _gBasic.Width = 576; Controls.Add(_gBasic);
+            _gProc = new GroupBox(); _gProc.Text = "进程诊断 (实时)";
+            _gProc.Location = new Point(12, 12); _gProc.Width = 576; Controls.Add(_gProc);
+            _gStat = new GroupBox(); _gStat.Text = "运行统计";
+            _gStat.Location = new Point(12, 12); _gStat.Width = 576; Controls.Add(_gStat);
 
-            _refreshBtn = new Button(); _refreshBtn.Text = "刷新";
-            _refreshBtn.Location = new Point(388, 474); _refreshBtn.Width = 90;
-            _refreshBtn.Click += delegate { LoadData(); };
-            Controls.Add(_refreshBtn);
+            _refreshBtn = new Button(); _refreshBtn.Text = "刷新"; _refreshBtn.Width = 90;
+            _refreshBtn.Click += delegate { LoadData(); }; Controls.Add(_refreshBtn);
             _closeBtn = new Button(); _closeBtn.Text = "关闭";
-            _closeBtn.DialogResult = DialogResult.Cancel;
-            _closeBtn.Location = new Point(492, 474); _closeBtn.Width = 90;
+            _closeBtn.DialogResult = DialogResult.Cancel; _closeBtn.Width = 90;
             Controls.Add(_closeBtn);
 
             LoadData();
         }
 
-        private void AddRow(ListViewGroup g, string k, string v)
+        // 填充分组: 左标签右值, 全部左对齐同字体; 返回分组高度
+        private int FillGroup(GroupBox g, List<string[]> rows)
         {
-            ListViewItem it = new ListViewItem(k, g);
-            it.SubItems.Add(v);
-            _lv.Items.Add(it);
+            g.Controls.Clear();
+            int y = 22;
+            foreach (string[] row in rows)
+            {
+                Label l = new Label();
+                l.Text = row[0]; l.AutoSize = true; l.Location = new Point(18, y);
+                g.Controls.Add(l);
+                Label v = new Label();
+                v.Text = row[1]; v.AutoSize = true;
+                v.Location = new Point(150, y);
+                v.MaximumSize = new Size(416, 0);   // 超长值自动换行
+                g.Controls.Add(v);
+                int h = v.PreferredSize.Height;
+                y += Math.Max(24, h + 6);
+            }
+            g.Height = y + 4;
+            return g.Height;
         }
 
         private void LoadData()
@@ -1133,46 +1141,53 @@ namespace ProxyDirector
             EngineSnapshot snap = _engine.Snapshot;
             ProxyState st = null;
             foreach (ProxyState s in snap.states) if (s.cfg.name == _name) { st = s; break; }
-            _lv.BeginUpdate();
-            _lv.Groups.Clear();
-            _lv.Items.Clear();
             if (st == null)
             {
-                ListViewGroup g = new ListViewGroup("提示");
-                _lv.Groups.Add(g);
-                AddRow(g, "提示", "代理不存在 (可能已被删除)");
-                _lv.EndUpdate();
+                FillGroup(_gBasic, new List<string[]> { new string[] { "提示", "代理不存在 (可能已被删除)" } });
+                FillGroup(_gProc, new List<string[]>());
+                FillGroup(_gStat, new List<string[]>());
+                LayoutBottom();
                 return;
             }
 
-            ListViewGroup gBasic = new ListViewGroup("基本信息");
-            ListViewGroup gProc = new ListViewGroup("进程诊断 (实时)");
-            ListViewGroup gStat = new ListViewGroup("运行统计");
-            _lv.Groups.Add(gBasic); _lv.Groups.Add(gProc); _lv.Groups.Add(gStat);
+            List<string[]> basic = new List<string[]>();
+            basic.Add(new string[] { "名称", st.cfg.name + (st.cfg.name == snap.currentName ? "   [当前生效中]" : "") });
+            basic.Add(new string[] { "地址", st.cfg.host + ":" + st.cfg.port });
+            basic.Add(new string[] { "协议", st.cfg.protocol });
+            basic.Add(new string[] { "状态", st.linkOk ? "可用  " + st.latencyMs + " ms" : "不可用" });
+            basic.Add(new string[] { "添加日期", string.IsNullOrEmpty(st.cfg.createdAt) ? "-" : st.cfg.createdAt });
+            basic.Add(new string[] { "备注", string.IsNullOrEmpty(st.cfg.note) ? "-" : st.cfg.note });
+            basic.Add(new string[] { "测速目标", string.IsNullOrEmpty(st.cfg.testUrlOverride) ? "全局目标池" : st.cfg.testUrlOverride });
 
-            AddRow(gBasic, "名称", st.cfg.name + (st.cfg.name == snap.currentName ? "  [当前生效中]" : ""));
-            AddRow(gBasic, "地址", st.cfg.host + ":" + st.cfg.port);
-            AddRow(gBasic, "协议", st.cfg.protocol);
-            AddRow(gBasic, "状态", st.linkOk ? "可用  " + st.latencyMs + " ms" : "不可用");
-            AddRow(gBasic, "添加日期", string.IsNullOrEmpty(st.cfg.createdAt) ? "-" : st.cfg.createdAt);
-            AddRow(gBasic, "备注", string.IsNullOrEmpty(st.cfg.note) ? "-" : st.cfg.note);
-            AddRow(gBasic, "测速目标", string.IsNullOrEmpty(st.cfg.testUrlOverride) ? "全局目标池" : st.cfg.testUrlOverride);
-
-            foreach (string[] row in ProcessRows(st.cfg)) AddRow(gProc, row[0], row[1]);
-
-            AddRow(gStat, "进程号", PidList(st.cfg.processName));
-            AddRow(gStat, "可用率", st.statTotal > 0
-                ? Math.Round(st.successRate * 100, 1) + "%  (" + st.statOk + "/" + st.statTotal + " 轮)" : "暂无数据");
-            AddRow(gStat, "延迟历史", MiniChart(st.history));
-            AddRow(gStat, "最近延迟", HistoryText(st.history));
-            AddRow(gStat, "上次可用", FmtTime(st.lastOk));
-            AddRow(gStat, "上次失败", FmtTime(st.lastFail));
-            AddRow(gStat, "被选中", st.switchCount + " 次");
-            AddRow(gStat, "累计生效", FmtMinutes(st.totalActiveMinutes));
+            List<string[]> stat = new List<string[]>();
+            stat.Add(new string[] { "进程号", PidList(st.cfg.processName) });
+            stat.Add(new string[] { "可用率", st.statTotal > 0
+                ? Math.Round(st.successRate * 100, 1) + "%  (" + st.statOk + "/" + st.statTotal + " 轮)" : "暂无数据" });
+            stat.Add(new string[] { "延迟历史", MiniChart(st.history) });
+            stat.Add(new string[] { "最近延迟", HistoryText(st.history) });
+            stat.Add(new string[] { "上次可用", FmtTime(st.lastOk) });
+            stat.Add(new string[] { "上次失败", FmtTime(st.lastFail) });
+            stat.Add(new string[] { "被选中", st.switchCount + " 次" });
+            stat.Add(new string[] { "累计生效", FmtMinutes(st.totalActiveMinutes) });
             if (st.activeSince.HasValue)
-                AddRow(gStat, "本次生效", "自 " + st.activeSince.Value.ToString("HH:mm:ss")
-                        + " 起, 已 " + FmtMinutes((DateTime.Now - st.activeSince.Value).TotalMinutes));
-            _lv.EndUpdate();
+                stat.Add(new string[] { "本次生效", "自 " + st.activeSince.Value.ToString("HH:mm:ss")
+                        + " 起, 已 " + FmtMinutes((DateTime.Now - st.activeSince.Value).TotalMinutes) });
+
+            int h1 = FillGroup(_gBasic, basic);
+            int h2 = FillGroup(_gProc, ProcessRows(st.cfg));
+            int h3 = FillGroup(_gStat, stat);
+            _gBasic.Top = 12;
+            _gProc.Top = 12 + h1 + 6;
+            _gStat.Top = _gProc.Top + h2 + 6;
+            LayoutBottom();
+        }
+
+        private void LayoutBottom()
+        {
+            int y = Math.Max(_gStat.Bottom, _gProc.Bottom) + 10;
+            _refreshBtn.Location = new Point(396, y);
+            _closeBtn.Location = new Point(494, y);
+            ClientSize = new Size(600, y + 42);
         }
 
         private static string FmtTime(DateTime? t) { return t.HasValue ? t.Value.ToString("HH:mm:ss") : "-"; }
@@ -1287,7 +1302,7 @@ namespace ProxyDirector
         private Engine _engine;
         private AppConfig _cfg;
         private ListView _lv;
-        private Button _addBtn, _delBtn, _rescanBtn, _testBtn, _pauseBtn, _switchBtn;
+        private Button _addBtn, _delBtn, _rescanBtn, _testBtn, _pauseBtn, _switchBtn, _detailBtn, _editBtn;
         private NumericUpDown _intervalNum, _thresholdNum, _dwellNum;
         private Button _saveBtn;
         private StatusStrip _status;
@@ -1342,8 +1357,8 @@ namespace ProxyDirector
             _testBtn = MkBtn("立即测速", 332, 316, OnTestNow);
             _switchBtn = MkBtn("手动切到此行", 432, 316, OnManualSwitch);
             _pauseBtn = MkBtn("暂停自动切换", 552, 316, OnPauseToggle);
-            MkBtn("详细属性", 12, 350, OnDetail);
-            MkBtn("修改属性", 112, 350, OnEditProp);
+            _detailBtn = MkBtn("详细属性", 12, 350, OnDetail);
+            _editBtn = MkBtn("修改属性", 112, 350, OnEditProp);
 
             // 列表右键菜单
             _lv.ContextMenu = new ContextMenu(new MenuItem[] {
@@ -1351,6 +1366,10 @@ namespace ProxyDirector
                 new MenuItem("修改属性", delegate(object s, EventArgs e) { OnEditProp(null, null); }),
                 new MenuItem("删除", delegate(object s, EventArgs e) { OnDel(null, null); })
             });
+
+            // 未选中行时行级操作按钮置灰
+            _lv.SelectedIndexChanged += delegate { RefreshRowBtnStates(); };
+            RefreshRowBtnStates();
 
             Label s1 = new Label(); s1.Text = "周期(秒)"; s1.AutoSize = true; s1.Location = new Point(12, 388); Controls.Add(s1);
             _intervalNum = new NumericUpDown(); _intervalNum.Location = new Point(80, 384); _intervalNum.Width = 70;
@@ -1468,9 +1487,18 @@ namespace ProxyDirector
                 _stDecision.Text = "⚠ " + s.externalConflict;
         }
 
+        private void RefreshRowBtnStates()
+        {
+            bool has = _lv.SelectedItems.Count > 0;
+            _delBtn.Enabled = has;
+            _switchBtn.Enabled = has;
+            _detailBtn.Enabled = has;
+            _editBtn.Enabled = has;
+        }
+
         private string SelectedName()
         {
-            if (_lv.SelectedItems.Count == 0) { MessageBox.Show("请先选中一行"); return null; }
+            if (_lv.SelectedItems.Count == 0) return null;   // 按钮已置灰, 正常路径到不了这里
             return _lv.SelectedItems[0].SubItems[1].Text;
         }
 
