@@ -1366,7 +1366,7 @@ namespace ProxyDirector
         private Engine _engine;
         private AppConfig _cfg;
         private ListView _lv;
-        private Button _addBtn, _delBtn, _rescanBtn, _testBtn, _pauseBtn, _switchBtn, _detailBtn, _editBtn, _toggleBtn;
+        private Button _addBtn, _delBtn, _rescanBtn, _testBtn, _pauseBtn, _switchBtn, _toggleBtn;
         private NumericUpDown _intervalNum, _thresholdNum, _dwellNum;
         private Button _saveBtn;
         private StatusStrip _status;
@@ -1415,15 +1415,14 @@ namespace ProxyDirector
             _lv.Columns.Add("进程", 100);
             Controls.Add(_lv);
 
+            // 单行三组: 全局操作 | 行级操作 | 切换开关
             _addBtn = MkBtn("添加代理", 12, 316, OnAdd);
-            _delBtn = MkBtn("删除所选", 112, 316, OnDel);
+            _testBtn = MkBtn("立即测速", 112, 316, OnTestNow);
             _rescanBtn = MkBtn("重新扫描端口", 212, 316, OnRescan);
-            _testBtn = MkBtn("立即测速", 332, 316, OnTestNow);
-            _switchBtn = MkBtn("切到此代理", 432, 316, OnManualSwitch);
-            _pauseBtn = MkBtn("暂停自动切换", 552, 316, OnPauseToggle);
-            _detailBtn = MkBtn("详细属性", 12, 350, OnDetail);
-            _editBtn = MkBtn("修改属性", 112, 350, OnEditProp);
-            _toggleBtn = MkBtn("禁用", 212, 350, OnToggleEnable);
+            _switchBtn = MkBtn("切到此代理", 332, 316, OnManualSwitch);
+            _toggleBtn = MkBtn("禁用", 432, 316, OnToggleEnable);
+            _delBtn = MkBtn("删除", 532, 316, OnDel);
+            _pauseBtn = MkBtn("暂停自动切换", 652, 316, OnPauseToggle);
 
             // 列表右键菜单
             ContextMenu cm = new ContextMenu();
@@ -1453,24 +1452,24 @@ namespace ProxyDirector
             _lv.SelectedIndexChanged += delegate { RefreshRowBtnStates(); };
             RefreshRowBtnStates();
 
-            Label s1 = new Label(); s1.Text = "周期(秒)"; s1.AutoSize = true; s1.Location = new Point(12, 388); Controls.Add(s1);
-            _intervalNum = new NumericUpDown(); _intervalNum.Location = new Point(80, 384); _intervalNum.Width = 70;
+            Label s1 = new Label(); s1.Text = "周期(秒)"; s1.AutoSize = true; s1.Location = new Point(12, 360); Controls.Add(s1);
+            _intervalNum = new NumericUpDown(); _intervalNum.Location = new Point(80, 356); _intervalNum.Width = 70;
             _intervalNum.Minimum = 15; _intervalNum.Maximum = 3600; Controls.Add(_intervalNum);
 
-            Label s2 = new Label(); s2.Text = "阈值(%)"; s2.AutoSize = true; s2.Location = new Point(170, 388); Controls.Add(s2);
-            _thresholdNum = new NumericUpDown(); _thresholdNum.Location = new Point(230, 384); _thresholdNum.Width = 60;
+            Label s2 = new Label(); s2.Text = "阈值(%)"; s2.AutoSize = true; s2.Location = new Point(170, 360); Controls.Add(s2);
+            _thresholdNum = new NumericUpDown(); _thresholdNum.Location = new Point(230, 356); _thresholdNum.Width = 60;
             _thresholdNum.Minimum = 5; _thresholdNum.Maximum = 90; Controls.Add(_thresholdNum);
 
-            Label s3 = new Label(); s3.Text = "停留(分)"; s3.AutoSize = true; s3.Location = new Point(310, 388); Controls.Add(s3);
-            _dwellNum = new NumericUpDown(); _dwellNum.Location = new Point(375, 384); _dwellNum.Width = 60;
+            Label s3 = new Label(); s3.Text = "停留(分)"; s3.AutoSize = true; s3.Location = new Point(310, 360); Controls.Add(s3);
+            _dwellNum = new NumericUpDown(); _dwellNum.Location = new Point(375, 356); _dwellNum.Width = 60;
             _dwellNum.Minimum = 1; _dwellNum.Maximum = 120; Controls.Add(_dwellNum);
 
-            _saveBtn = MkBtn("保存设置", 460, 382, OnSaveSettings);
-            MkBtn("打开日志", 560, 382, OnOpenLog);
+            _saveBtn = MkBtn("保存设置", 460, 354, OnSaveSettings);
+            MkBtn("打开日志", 560, 354, OnOpenLog);
 
             Label note = new Label();
-            note.Text = "使用前提: 关闭各代理客户端的\"系统代理\"开关, 由本工具独占管理系统代理。\n关闭窗口 = 最小化到托盘; 退出请用托盘图标右键 -> 退出。";
-            note.ForeColor = Color.DimGray; note.AutoSize = true; note.Location = new Point(12, 424);
+            note.Text = "使用前提: 关闭各代理客户端的\"系统代理\"开关, 由本工具独占管理系统代理。 关闭窗口 = 最小化到托盘; 退出请用托盘图标右键 -> 退出。\n行级操作(切到/禁用/删除/详细属性/修改属性)请先选中列表行, 或使用右键菜单。";
+            note.ForeColor = Color.DimGray; note.AutoSize = true; note.Location = new Point(12, 392);
             Controls.Add(note);
 
             _status = new StatusStrip();
@@ -1583,8 +1582,6 @@ namespace ProxyDirector
             bool has = _lv.SelectedItems.Count > 0;
             _delBtn.Enabled = has;
             _switchBtn.Enabled = has;
-            _detailBtn.Enabled = has;
-            _editBtn.Enabled = has;
             _toggleBtn.Enabled = has;
             ProxyEntry pe = SelectedEntry();
             _toggleBtn.Text = (pe != null && !pe.enabled) ? "启用" : "禁用";
