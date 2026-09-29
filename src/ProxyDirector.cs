@@ -121,16 +121,33 @@ namespace ProxyDirector
     }
 
     // ============================ 端口发现 ============================
+    public class PortInfo { public int port; public string owner; }
+
     public static class PortDiscovery
     {
-        // 进程名 -> 该进程监听的 TCP 端口列表 (通过 netstat -ano + PID 映射)
-        public static List<int> GetListeningPorts(string processName)
+        // 进程名前缀 -> 匹配进程家族监听的 TCP 端口列表 (含归属进程名)
+        // 输入 "代理客户端" 可同时覆盖 代理客户端.exe / 代理内核.exe / 代理客户端HelperService.exe;
+        // 非代理端口(如 HelperService 的 47890)由上层协议识别阶段排除。
+        public static List<PortInfo> GetListeningPortInfos(string processNamePrefix)
         {
-            List<int> result = new List<int>();
+            List<PortInfo> result = new List<PortInfo>();
             try
             {
-                int[] pids = Process.GetProcessesByName(processName).Select(p => p.Id).ToArray();
-                if (pids.Length == 0) return result;
+                List<int> pids = new List<int>();
+                Dictionary<int, string> pidOwner = new Dictionary<int, string>();
+                foreach (Process p in Process.GetProcesses())
+                {
+                    try
+                    {
+                        if (p.ProcessName.StartsWith(processNamePrefix, StringComparison.OrdinalIgnoreCase))
+                        {
+                            pids.Add(p.Id);
+                            pidOwner[p.Id] = p.ProcessName;
+                        }
+                    }
+                    catch { }
+                }
+                if (pids.Count == 0) return result;
 
                 ProcessStartInfo psi = new ProcessStartInfo();
                 psi.FileName = "netstat.exe";
@@ -149,15 +166,31 @@ namespace ProxyDirector
                         string state = m.Groups[3].Value.ToUpperInvariant();
                         int pid = int.Parse(m.Groups[4].Value);
                         int port = int.Parse(m.Groups[2].Value);
-                        if (state.Contains("LISTEN") && Array.IndexOf(pids, pid) >= 0 && port > 0)
+                        if (state.Contains("LISTEN") && Array.IndexOf(pids.ToArray(), pid) >= 0 && port > 0)
                         {
-                            if (!result.Contains(port)) result.Add(port);
+                            bool dup = false;
+                            foreach (PortInfo pi in result) if (pi.port == port) { dup = true; break; }
+                            if (!dup)
+                            {
+                                PortInfo info = new PortInfo();
+                                info.port = port;
+                                string owner; pidOwner.TryGetValue(pid, out owner);
+                                info.owner = owner == null ? "" : owner;
+                                result.Add(info);
+                            }
                         }
                     }
                 }
-                result.Sort();
+                result.Sort(delegate(PortInfo a, PortInfo b) { return a.port.CompareTo(b.port); });
             }
-            catch (Exception ex) { Logger.Log("端口发现失败[" + processName + "]: " + ex.Message); }
+            catch (Exception ex) { Logger.Log("端口发现失败[" + processNamePrefix + "]: " + ex.Message); }
+            return result;
+        }
+
+        public static List<int> GetListeningPorts(string processName)
+        {
+            List<int> result = new List<int>();
+            foreach (PortInfo pi in GetListeningPortInfos(processName)) result.Add(pi.port);
             return result;
         }
     }
@@ -704,20 +737,20 @@ namespace ProxyDirector
             _candList.Items.Clear();
             string proc = _procBox.Text.Trim();
             if (proc.Length == 0) { MessageBox.Show("请输入进程名"); return; }
-            List<int> ports = PortDiscovery.GetListeningPorts(proc);
+            List<PortInfo> ports = PortDiscovery.GetListeningPortInfos(proc);
             if (ports.Count == 0)
             {
-                _candList.Items.Add("未找到该进程监听的端口 (进程未运行?)", false);
+                _candList.Items.Add("未找到该进程监听的端口 (客户端未运行?)", false);
                 return;
             }
-            foreach (int pt in ports)
+            foreach (PortInfo pi in ports)
             {
-                string proto = ProtocolProbe.Identify("127.0.0.1", pt, 800);
-                string label = pt.ToString() + "  —  " + (proto == "UNKNOWN" ? "非代理端口" : proto + " 代理");
-                int idx = _candList.Items.Add(label, false);
-                _candList.Items[idx] = label;
+                string proto = ProtocolProbe.Identify("127.0.0.1", pi.port, 800);
+                string label = pi.port + "  —  " + (proto == "UNKNOWN" ? "非代理端口" : proto + " 代理")
+                             + "  [" + pi.owner + "]";
+                _candList.Items.Add(label, false);
                 // 存 port 到 item 的 tag 不方便, 用并行列表
-                _portMap[label] = pt; _protoMap[label] = proto;
+                _portMap[label] = pi.port; _protoMap[label] = proto;
             }
             if (_nameBox.Text.Length == 0) _nameBox.Text = proc;
         }
@@ -1007,13 +1040,14 @@ namespace ProxyDirector
                 if (args[1] == "scan" && args.Length >= 3)
                 {
                     string proc = args[2];
-                    sb.AppendLine("进程 " + proc + " 监听的端口:");
-                    List<int> ports = PortDiscovery.GetListeningPorts(proc);
+                    sb.AppendLine("进程前缀 " + proc + " 监听的端口:");
+                    List<PortInfo> ports = PortDiscovery.GetListeningPortInfos(proc);
                     if (ports.Count == 0) sb.AppendLine("  (无 - 进程未运行或无监听)");
-                    foreach (int pt in ports)
+                    foreach (PortInfo pi in ports)
                     {
-                        string proto = ProtocolProbe.Identify("127.0.0.1", pt, 1000);
-                        sb.AppendLine("  " + pt + "  -> " + (proto == "UNKNOWN" ? "非代理端口" : proto + " 代理"));
+                        string proto = ProtocolProbe.Identify("127.0.0.1", pi.port, 1000);
+                        sb.AppendLine("  " + pi.port + "  -> " + (proto == "UNKNOWN" ? "非代理端口" : proto + " 代理")
+                                      + "  [" + pi.owner + "]");
                     }
                 }
                 else if (args[1] == "speed" || args[1] == "decide")
