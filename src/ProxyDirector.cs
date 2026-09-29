@@ -31,6 +31,7 @@ namespace ProxyDirector
         public string createdAt { get; set; }     // 添加时间 (旧配置自动补齐)
         public string note { get; set; }          // 备注 (如套餐信息)
         public string testUrlOverride { get; set; }  // 单独测速 URL, 空则用全局目标池
+        public bool enabled { get; set; }         // 禁用后测速与决策忽略该行
     }
 
     public class AppConfig
@@ -75,12 +76,14 @@ namespace ProxyDirector
             {
                 if (File.Exists(ConfigPath))
                 {
+                    string raw = File.ReadAllText(ConfigPath);
                     JavaScriptSerializer js = new JavaScriptSerializer();
-                    AppConfig cfg = js.Deserialize<AppConfig>(File.ReadAllText(ConfigPath));
+                    AppConfig cfg = js.Deserialize<AppConfig>(raw);
                     if (cfg != null && cfg.proxies != null)
                     {
-                        // 旧配置兼容: 补齐新增字段
+                        // 旧配置兼容: 补齐新增字段 (bool 缺省会反序列化为 false, 须显式识别旧格式)
                         bool dirty = false;
+                        bool legacyEnabled = !raw.Contains("\"enabled\"");
                         foreach (ProxyEntry p in cfg.proxies)
                         {
                             if (string.IsNullOrEmpty(p.createdAt))
@@ -88,6 +91,7 @@ namespace ProxyDirector
                             if (p.host == null) p.host = "127.0.0.1";
                             if (p.note == null) p.note = "";
                             if (p.testUrlOverride == null) p.testUrlOverride = "";
+                            if (legacyEnabled) { p.enabled = true; dirty = true; }
                         }
                         if (dirty) Save(cfg);
                         return cfg;
@@ -392,15 +396,20 @@ namespace ProxyDirector
                                       string currentName, DateTime lastSwitch,
                                       Dictionary<string, int> failStreak)
         {
-            List<ProxyState> alive = states.Where(s => s.linkOk).ToList();
+            List<ProxyState> alive = states.Where(s => s.linkOk && s.cfg.enabled).ToList();
             if (alive.Count == 0)
-                return new Decision { type = DecisionType.AllDown, reason = "所有代理链路均不可用" };
+                return new Decision { type = DecisionType.AllDown, reason = "所有代理链路均不可用或已禁用" };
 
             ProxyState best = alive.OrderBy(s => s.latencyMs).First();
 
             // 当前生效的代理是否存在且可用
             ProxyState current = null;
             foreach (ProxyState s in states) if (s.cfg.name == currentName) { current = s; break; }
+
+            // 当前代理被用户禁用: 明确意志, 立即切走不等失败确认
+            if (current != null && !current.cfg.enabled)
+                return new Decision { type = DecisionType.SwitchTo, targetName = best.cfg.name,
+                                      reason = "当前代理已禁用 -> 切换至 " + best.cfg.name };
 
             if (current == null || !current.linkOk)
             {
@@ -727,6 +736,14 @@ namespace ProxyDirector
             {
                 ProxyState st = new ProxyState();
                 st.cfg = p;
+                // 禁用行: 不测速不统计, 仅占位展示
+                if (!p.enabled)
+                {
+                    st.linkOk = false;
+                    st.detail = "已禁用";
+                    states.Add(st);
+                    continue;
+                }
                 SpeedResult r = SpeedTester.Test(p.host, p.port, _cfg, p.testUrlOverride);
                 st.linkOk = r.ok;
                 st.latencyMs = r.latencyMs;
@@ -796,6 +813,7 @@ namespace ProxyDirector
             // ---- 运行日志: 链路状态变化 + 本轮汇总 ----
             foreach (ProxyState st in states)
             {
+                if (!st.cfg.enabled) { _lastLinkOk.Remove(st.cfg.name); continue; }
                 bool prev;
                 if (_lastLinkOk.TryGetValue(st.cfg.name, out prev))
                 {
@@ -809,7 +827,8 @@ namespace ProxyDirector
             foreach (ProxyState st in states)
             {
                 if (sum.Length > 0) sum.Append(" | ");
-                sum.Append(st.cfg.name + "=" + (st.linkOk ? st.latencyMs + "ms" : "不可用"));
+                if (!st.cfg.enabled) sum.Append(st.cfg.name + "=已禁用");
+                else sum.Append(st.cfg.name + "=" + (st.linkOk ? st.latencyMs + "ms" : "不可用"));
             }
             if (sum.Length == 0) sum.Append("(无已配置代理)");
             Logger.Log("测速汇总: " + sum + " | 决策: " + decisionInfo
@@ -1020,6 +1039,7 @@ namespace ProxyDirector
                     pe.host = "127.0.0.1";
                     pe.port = port;
                     pe.protocol = proto;
+                    pe.enabled = true;   // 新添加的代理默认启用
                     Added.Add(pe);
                 }
             }
@@ -1034,6 +1054,7 @@ namespace ProxyDirector
     {
         private TextBox _nameBox, _hostBox, _portBox, _procBox, _noteBox, _urlBox;
         private ComboBox _protoBox;
+        private CheckBox _enabledBox;
         private Button _okBtn, _cancelBtn;
         public ProxyEntry Result;
 
@@ -1043,7 +1064,7 @@ namespace ProxyDirector
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false; MinimizeBox = false;
             StartPosition = FormStartPosition.CenterParent;
-            ClientSize = new Size(420, 448);
+            ClientSize = new Size(420, 496);
 
             int y = 10;
             _nameBox = MkCol("名称:", src.name, ref y);
@@ -1060,6 +1081,14 @@ namespace ProxyDirector
             _procBox = MkCol("进程名 (端口自动扫描用):", src.processName, ref y);
             _noteBox = MkCol("备注:", src.note == null ? "" : src.note, ref y);
             _urlBox = MkCol("单独测速 URL (留空使用全局目标池):", src.testUrlOverride == null ? "" : src.testUrlOverride, ref y);
+
+            _enabledBox = new CheckBox();
+            _enabledBox.Text = "启用 (参与测速与自动切换)";
+            _enabledBox.Checked = src.enabled;
+            _enabledBox.Location = new Point(12, y);
+            _enabledBox.Width = 396;
+            Controls.Add(_enabledBox);
+            y += 42;
 
             _okBtn = new Button(); _okBtn.Text = "保存"; _okBtn.Location = new Point(210, y + 2); _okBtn.Width = 90;
             _okBtn.Click += OnOk; Controls.Add(_okBtn);
@@ -1093,6 +1122,7 @@ namespace ProxyDirector
             Result.processName = _procBox.Text.Trim();
             Result.note = _noteBox.Text.Trim();
             Result.testUrlOverride = _urlBox.Text.Trim();
+            Result.enabled = _enabledBox.Checked;
             Result.createdAt = null;   // 由引擎保留原值
             DialogResult = DialogResult.OK;
             Close();
@@ -1318,7 +1348,7 @@ namespace ProxyDirector
         private Engine _engine;
         private AppConfig _cfg;
         private ListView _lv;
-        private Button _addBtn, _delBtn, _rescanBtn, _testBtn, _pauseBtn, _switchBtn, _detailBtn, _editBtn;
+        private Button _addBtn, _delBtn, _rescanBtn, _testBtn, _pauseBtn, _switchBtn, _detailBtn, _editBtn, _toggleBtn;
         private NumericUpDown _intervalNum, _thresholdNum, _dwellNum;
         private Button _saveBtn;
         private StatusStrip _status;
@@ -1375,11 +1405,14 @@ namespace ProxyDirector
             _pauseBtn = MkBtn("暂停自动切换", 552, 316, OnPauseToggle);
             _detailBtn = MkBtn("详细属性", 12, 350, OnDetail);
             _editBtn = MkBtn("修改属性", 112, 350, OnEditProp);
+            _toggleBtn = MkBtn("禁用", 212, 350, OnToggleEnable);
 
             // 列表右键菜单
             ContextMenu cm = new ContextMenu();
             MenuItem miSwitch = new MenuItem("切到此行", delegate(object s, EventArgs e) { OnManualSwitch(null, null); });
             cm.MenuItems.Add(miSwitch);
+            MenuItem miToggle = new MenuItem("禁用", delegate(object s, EventArgs e) { OnToggleEnable(null, null); });
+            cm.MenuItems.Add(miToggle);
             cm.MenuItems.Add(new MenuItem("立即测速", delegate(object s, EventArgs e) { OnTestNow(null, null); }));
             cm.MenuItems.Add(new MenuItem("扫描端口", delegate(object s, EventArgs e) { OnRescan(null, null); }));
             cm.MenuItems.Add(new MenuItem("-"));
@@ -1387,11 +1420,14 @@ namespace ProxyDirector
             MenuItem miEdit = new MenuItem("修改属性", delegate(object s, EventArgs e) { OnEditProp(null, null); });
             MenuItem miDel = new MenuItem("删除", delegate(object s, EventArgs e) { OnDel(null, null); });
             cm.MenuItems.Add(miDetail); cm.MenuItems.Add(miEdit); cm.MenuItems.Add(miDel);
-            // 弹出时行级项跟随选中状态置灰
+            // 弹出时行级项跟随选中状态置灰, 禁用/启用动态文案
             cm.Popup += delegate
             {
                 bool has = _lv.SelectedItems.Count > 0;
+                ProxyEntry pe = has ? SelectedEntry() : null;
                 miSwitch.Enabled = has; miDetail.Enabled = has; miEdit.Enabled = has; miDel.Enabled = has;
+                miToggle.Enabled = has;
+                miToggle.Text = (pe != null && !pe.enabled) ? "启用" : "禁用";
             };
             _lv.ContextMenu = cm;
 
@@ -1492,16 +1528,16 @@ namespace ProxyDirector
                 ListViewItem it = _lv.Items[i];
                 ProxyState st = s.states[i];
                 bool isCur = st.cfg.name == s.currentName;
-                it.SubItems[0].Text = isCur ? "●" : "";
+                it.SubItems[0].Text = !st.cfg.enabled ? "❌" : (isCur ? "●" : "");
                 it.SubItems[1].Text = st.cfg.name;
                 it.SubItems[2].Text = st.cfg.host + ":" + st.cfg.port;
                 it.SubItems[3].Text = st.cfg.protocol;
                 it.SubItems[4].Text = st.linkOk ? st.latencyMs + " ms" : "-";
-                it.SubItems[5].Text = st.linkOk ? "可用" : "不可用";
+                it.SubItems[5].Text = !st.cfg.enabled ? "已禁用" : (st.linkOk ? "可用" : "不可用");
                 it.SubItems[6].Text = st.detail;
                 it.SubItems[7].Text = st.cfg.processName;
-                it.BackColor = isCur ? Color.FromArgb(220, 240, 220) : SystemColors.Window;
-                it.ForeColor = st.linkOk ? SystemColors.WindowText : Color.Firebrick;
+                it.BackColor = (isCur && st.cfg.enabled) ? Color.FromArgb(220, 240, 220) : SystemColors.Window;
+                it.ForeColor = !st.cfg.enabled ? Color.Gray : (st.linkOk ? SystemColors.WindowText : Color.Firebrick);
             }
             _lv.EndUpdate();
 
@@ -1522,12 +1558,57 @@ namespace ProxyDirector
             _switchBtn.Enabled = has;
             _detailBtn.Enabled = has;
             _editBtn.Enabled = has;
+            _toggleBtn.Enabled = has;
+            ProxyEntry pe = SelectedEntry();
+            _toggleBtn.Text = (pe != null && !pe.enabled) ? "启用" : "禁用";
         }
 
         private string SelectedName()
         {
             if (_lv.SelectedItems.Count == 0) return null;   // 按钮已置灰, 正常路径到不了这里
             return _lv.SelectedItems[0].SubItems[1].Text;
+        }
+
+        private ProxyEntry SelectedEntry()
+        {
+            string name = SelectedName();
+            if (name == null) return null;
+            AppConfig cur = _engine.Config;   // 始终操作引擎当前配置对象
+            foreach (ProxyEntry p in cur.proxies) if (p.name == name) { _cfg = cur; return p; }
+            return null;
+        }
+
+        // 禁用/启用当前选中行; 禁用当前生效者时立即切到最快可用链路
+        private void OnToggleEnable(object sender, EventArgs e)
+        {
+            ProxyEntry pe = SelectedEntry();
+            if (pe == null) return;
+            pe.enabled = !pe.enabled;
+            ConfigStore.Save(_cfg);
+            Logger.Log("用户" + (pe.enabled ? "启用" : "禁用") + "代理: " + pe.name);
+
+            if (!pe.enabled)
+            {
+                EngineSnapshot s = _engine.Snapshot;
+                bool wasCurrent = pe.name == s.currentName;
+                if (wasCurrent)
+                {
+                    ProxyState best = null;
+                    foreach (ProxyState st in s.states)
+                    {
+                        if (st.cfg.enabled && st.cfg.name != pe.name && st.linkOk)
+                            if (best == null || st.latencyMs < best.latencyMs) best = st;
+                    }
+                    if (best != null)
+                    {
+                        _engine.ManualSwitch(best.cfg.name);
+                        Logger.Log("生效代理被禁用, 已切换至 " + best.cfg.name);
+                    }
+                    else Logger.Log("警告: 禁用 " + pe.name + " 后无可用代理, 系统代理保持原指向");
+                }
+            }
+            _engine.ForceCheck();
+            RefreshRowBtnStates();
         }
 
         private void OnDetail(object sender, EventArgs e)
