@@ -1024,35 +1024,36 @@ namespace ProxyDirector
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false; MinimizeBox = false;
             StartPosition = FormStartPosition.CenterParent;
-            ClientSize = new Size(400, 286);
+            ClientSize = new Size(420, 448);
 
-            int y = 14;
-            _nameBox = MkRow("名称:", src.name, ref y);
-            _hostBox = MkRow("地址 (本地客户端为 127.0.0.1, 可填远程代理):", src.host, ref y);
-            _portBox = MkRow("端口:", src.port.ToString(), ref y);
+            int y = 10;
+            _nameBox = MkCol("名称:", src.name, ref y);
+            _hostBox = MkCol("地址 (本地客户端填 127.0.0.1, 也可直接填远程代理服务器):", src.host, ref y);
+            _portBox = MkCol("端口:", src.port.ToString(), ref y);
 
             Label lp = new Label(); lp.Text = "协议:"; lp.AutoSize = true; lp.Location = new Point(12, y); Controls.Add(lp);
             _protoBox = new ComboBox(); _protoBox.DropDownStyle = ComboBoxStyle.DropDownList;
             _protoBox.Items.Add("HTTP"); _protoBox.Items.Add("SOCKS5"); _protoBox.Items.Add("UNKNOWN");
             _protoBox.SelectedItem = string.IsNullOrEmpty(src.protocol) ? "HTTP" : src.protocol;
-            _protoBox.Location = new Point(170, y - 3); _protoBox.Width = 210; Controls.Add(_protoBox);
-            y += 34;
+            _protoBox.Location = new Point(12, y + 20); _protoBox.Width = 396; Controls.Add(_protoBox);
+            y += 54;
 
-            _procBox = MkRow("进程名 (端口自动扫描用):", src.processName, ref y);
-            _noteBox = MkRow("备注:", src.note == null ? "" : src.note, ref y);
-            _urlBox = MkRow("单独测速 URL (留空用全局):", src.testUrlOverride == null ? "" : src.testUrlOverride, ref y);
+            _procBox = MkCol("进程名 (端口自动扫描用):", src.processName, ref y);
+            _noteBox = MkCol("备注:", src.note == null ? "" : src.note, ref y);
+            _urlBox = MkCol("单独测速 URL (留空使用全局目标池):", src.testUrlOverride == null ? "" : src.testUrlOverride, ref y);
 
-            _okBtn = new Button(); _okBtn.Text = "保存"; _okBtn.Location = new Point(190, y + 6); _okBtn.Width = 90;
+            _okBtn = new Button(); _okBtn.Text = "保存"; _okBtn.Location = new Point(210, y + 2); _okBtn.Width = 90;
             _okBtn.Click += OnOk; Controls.Add(_okBtn);
             _cancelBtn = new Button(); _cancelBtn.Text = "取消"; _cancelBtn.DialogResult = DialogResult.Cancel;
-            _cancelBtn.Location = new Point(292, y + 6); _cancelBtn.Width = 90; Controls.Add(_cancelBtn);
+            _cancelBtn.Location = new Point(312, y + 2); _cancelBtn.Width = 90; Controls.Add(_cancelBtn);
         }
 
-        private TextBox MkRow(string label, string value, ref int y)
+        // 上下式布局: 标签在上方占整行, 输入框在下方, 长标签不再遮挡输入框
+        private TextBox MkCol(string label, string value, ref int y)
         {
-            Label l = new Label(); l.Text = label; l.AutoSize = true; l.Location = new Point(12, y + 3); Controls.Add(l);
-            TextBox tb = new TextBox(); tb.Text = value; tb.Location = new Point(170, y); tb.Width = 210; Controls.Add(tb);
-            y += 34;
+            Label l = new Label(); l.Text = label; l.AutoSize = true; l.Location = new Point(12, y); Controls.Add(l);
+            TextBox tb = new TextBox(); tb.Text = value; tb.Location = new Point(12, y + 20); tb.Width = 396; Controls.Add(tb);
+            y += 54;
             return tb;
         }
 
@@ -1084,7 +1085,7 @@ namespace ProxyDirector
     {
         private Engine _engine;
         private string _name;
-        private Label _content;
+        private ListView _lv;
         private Button _refreshBtn, _closeBtn;
 
         public DetailProxyForm(Engine engine, string proxyName)
@@ -1095,26 +1096,36 @@ namespace ProxyDirector
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false; MinimizeBox = false;
             StartPosition = FormStartPosition.CenterParent;
-            ClientSize = new Size(560, 500);
+            ClientSize = new Size(600, 522);
 
-            _content = new Label();
-            _content.Location = new Point(14, 14);
-            _content.Size = new Size(532, 420);
-            _content.Font = new Font("Consolas", 9F);
-            _content.BackColor = Color.White;
-            _content.BorderStyle = BorderStyle.FixedSingle;
-            Controls.Add(_content);
+            // Windows 属性页样式: 分组 + 属性/值 两列
+            _lv = new ListView();
+            _lv.View = View.Details;
+            _lv.FullRowSelect = true;
+            _lv.GridLines = true;
+            _lv.Location = new Point(12, 12);
+            _lv.Size = new Size(576, 452);
+            _lv.Columns.Add("属性", 168);
+            _lv.Columns.Add("值", 388);
+            Controls.Add(_lv);
 
             _refreshBtn = new Button(); _refreshBtn.Text = "刷新";
-            _refreshBtn.Location = new Point(350, 448); _refreshBtn.Width = 90;
+            _refreshBtn.Location = new Point(388, 474); _refreshBtn.Width = 90;
             _refreshBtn.Click += delegate { LoadData(); };
             Controls.Add(_refreshBtn);
             _closeBtn = new Button(); _closeBtn.Text = "关闭";
             _closeBtn.DialogResult = DialogResult.Cancel;
-            _closeBtn.Location = new Point(456, 448); _closeBtn.Width = 90;
+            _closeBtn.Location = new Point(492, 474); _closeBtn.Width = 90;
             Controls.Add(_closeBtn);
 
             LoadData();
+        }
+
+        private void AddRow(ListViewGroup g, string k, string v)
+        {
+            ListViewItem it = new ListViewItem(k, g);
+            it.SubItems.Add(v);
+            _lv.Items.Add(it);
         }
 
         private void LoadData()
@@ -1122,39 +1133,47 @@ namespace ProxyDirector
             EngineSnapshot snap = _engine.Snapshot;
             ProxyState st = null;
             foreach (ProxyState s in snap.states) if (s.cfg.name == _name) { st = s; break; }
-            if (st == null) { _content.Text = "代理不存在 (可能已被删除)"; return; }
+            _lv.BeginUpdate();
+            _lv.Groups.Clear();
+            _lv.Items.Clear();
+            if (st == null)
+            {
+                ListViewGroup g = new ListViewGroup("提示");
+                _lv.Groups.Add(g);
+                AddRow(g, "提示", "代理不存在 (可能已被删除)");
+                _lv.EndUpdate();
+                return;
+            }
 
-            StringBuilder sb = new StringBuilder();
-            sb.AppendLine("┌─ 基本信息 ─────────────────────────");
-            sb.AppendLine("  名称      : " + st.cfg.name + (st.cfg.name == snap.currentName ? "   [当前生效中]" : ""));
-            sb.AppendLine("  地址      : " + st.cfg.host + ":" + st.cfg.port);
-            sb.AppendLine("  协议      : " + st.cfg.protocol);
-            sb.AppendLine("  状态      : " + (st.linkOk ? "可用  " + st.latencyMs + " ms" : "不可用  (连续失败 " + streakOf(st) + " 轮)"));
-            sb.AppendLine("  添加日期  : " + (string.IsNullOrEmpty(st.cfg.createdAt) ? "-" : st.cfg.createdAt));
-            sb.AppendLine("  备注      : " + (string.IsNullOrEmpty(st.cfg.note) ? "-" : st.cfg.note));
-            sb.AppendLine("  测速目标  : " + (string.IsNullOrEmpty(st.cfg.testUrlOverride) ? "全局目标池" : st.cfg.testUrlOverride));
-            sb.AppendLine();
-            sb.AppendLine("┌─ 进程诊断 (实时) ──────────────────");
-            AppendProcessInfo(sb, st.cfg);
-            sb.AppendLine();
-            sb.AppendLine("┌─ 运行统计 ─────────────────────────");
-            sb.AppendLine("  进程号    : " + PidList(st.cfg.processName));
-            sb.AppendLine("  可用率    : " + (st.statTotal > 0
-                ? Math.Round(st.successRate * 100, 1) + "%  (" + st.statOk + "/" + st.statTotal + " 轮)" : "暂无数据"));
-            sb.AppendLine("  延迟历史  : " + MiniChart(st.history));
-            sb.AppendLine("             " + HistoryText(st.history));
-            sb.AppendLine("  上次可用  : " + FmtTime(st.lastOk));
-            sb.AppendLine("  上次失败  : " + FmtTime(st.lastFail));
-            sb.AppendLine("  被选中    : " + st.switchCount + " 次");
-            sb.AppendLine("  累计生效  : " + FmtMinutes(st.totalActiveMinutes));
+            ListViewGroup gBasic = new ListViewGroup("基本信息");
+            ListViewGroup gProc = new ListViewGroup("进程诊断 (实时)");
+            ListViewGroup gStat = new ListViewGroup("运行统计");
+            _lv.Groups.Add(gBasic); _lv.Groups.Add(gProc); _lv.Groups.Add(gStat);
+
+            AddRow(gBasic, "名称", st.cfg.name + (st.cfg.name == snap.currentName ? "  [当前生效中]" : ""));
+            AddRow(gBasic, "地址", st.cfg.host + ":" + st.cfg.port);
+            AddRow(gBasic, "协议", st.cfg.protocol);
+            AddRow(gBasic, "状态", st.linkOk ? "可用  " + st.latencyMs + " ms" : "不可用");
+            AddRow(gBasic, "添加日期", string.IsNullOrEmpty(st.cfg.createdAt) ? "-" : st.cfg.createdAt);
+            AddRow(gBasic, "备注", string.IsNullOrEmpty(st.cfg.note) ? "-" : st.cfg.note);
+            AddRow(gBasic, "测速目标", string.IsNullOrEmpty(st.cfg.testUrlOverride) ? "全局目标池" : st.cfg.testUrlOverride);
+
+            foreach (string[] row in ProcessRows(st.cfg)) AddRow(gProc, row[0], row[1]);
+
+            AddRow(gStat, "进程号", PidList(st.cfg.processName));
+            AddRow(gStat, "可用率", st.statTotal > 0
+                ? Math.Round(st.successRate * 100, 1) + "%  (" + st.statOk + "/" + st.statTotal + " 轮)" : "暂无数据");
+            AddRow(gStat, "延迟历史", MiniChart(st.history));
+            AddRow(gStat, "最近延迟", HistoryText(st.history));
+            AddRow(gStat, "上次可用", FmtTime(st.lastOk));
+            AddRow(gStat, "上次失败", FmtTime(st.lastFail));
+            AddRow(gStat, "被选中", st.switchCount + " 次");
+            AddRow(gStat, "累计生效", FmtMinutes(st.totalActiveMinutes));
             if (st.activeSince.HasValue)
-                sb.AppendLine("  本次生效  : 自 " + st.activeSince.Value.ToString("HH:mm:ss")
-                              + " 已 " + FmtMinutes((DateTime.Now - st.activeSince.Value).TotalMinutes));
-            _content.Text = sb.ToString();
+                AddRow(gStat, "本次生效", "自 " + st.activeSince.Value.ToString("HH:mm:ss")
+                        + " 起, 已 " + FmtMinutes((DateTime.Now - st.activeSince.Value).TotalMinutes));
+            _lv.EndUpdate();
         }
-
-        private int streakOf(ProxyState st) { return st.linkOk ? 0 : Math.Max(1, snapStreak(st)); }
-        private int snapStreak(ProxyState st) { return 0; }   // 连续失败轮数不进快照, 展示层用不可用状态近似
 
         private static string FmtTime(DateTime? t) { return t.HasValue ? t.Value.ToString("HH:mm:ss") : "-"; }
 
@@ -1220,8 +1239,10 @@ namespace ProxyDirector
             catch { return "-"; }
         }
 
-        public static void AppendProcessInfo(StringBuilder sb, ProxyEntry cfg)
+        // 进程诊断 (label, value) 行对; 详细窗口与 console 自检共用
+        public static List<string[]> ProcessRows(ProxyEntry cfg)
         {
+            List<string[]> rows = new List<string[]>();
             try
             {
                 bool any = false;
@@ -1235,19 +1256,28 @@ namespace ProxyDirector
                     try { path = p.MainModule.FileName; } catch { }
                     try { start = p.StartTime.ToString("yyyy-MM-dd HH:mm:ss"); } catch { }
                     try { mem = (p.WorkingSet64 / 1024 / 1024) + " MB"; } catch { }
-                    sb.AppendLine("  [" + p.ProcessName + "]  PID " + p.Id);
-                    sb.AppendLine("    路径    : " + path);
-                    sb.AppendLine("    启动于  : " + start + "    内存: " + mem);
+                    rows.Add(new string[] { "进程 [" + p.ProcessName + "]", "PID " + p.Id });
+                    rows.Add(new string[] { "    路径", path });
+                    rows.Add(new string[] { "    启动于", start + "    内存: " + mem });
                 }
-                if (!any) sb.AppendLine("  (进程未运行)");
-                // 端口实际归属
+                if (!any) rows.Add(new string[] { "进程", "未运行" });
                 foreach (PortInfo pi in PortDiscovery.GetListeningPortInfos(cfg.processName))
                 {
                     if (pi.port == cfg.port)
-                    { sb.AppendLine("  端口归属  : " + pi.port + " 由 [" + pi.owner + "] 监听"); break; }
+                    { rows.Add(new string[] { "端口归属", pi.port + " 由 [" + pi.owner + "] 监听" }); break; }
                 }
             }
-            catch (Exception ex) { sb.AppendLine("  (查询失败: " + ex.Message + ")"); }
+            catch (Exception ex) { rows.Add(new string[] { "进程", "查询失败: " + ex.Message }); }
+            return rows;
+        }
+
+        public static void AppendProcessInfo(StringBuilder sb, ProxyEntry cfg)
+        {
+            foreach (string[] row in ProcessRows(cfg))
+            {
+                if (row[0].StartsWith("    ")) sb.AppendLine("    " + row[0].TrimStart() + " : " + row[1]);
+                else sb.AppendLine("  " + row[0] + " : " + row[1]);
+            }
         }
     }
 
