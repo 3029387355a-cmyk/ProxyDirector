@@ -50,8 +50,15 @@
 dist\ProxyDirector.exe --console scan <进程名>      # 扫描某进程的代理端口
 dist\ProxyDirector.exe --console speed              # 按 config 测一轮速
 dist\ProxyDirector.exe --console decide             # 测速 + 决策 dry-run（不写注册表）
+dist\ProxyDirector.exe --console detail [名称]      # 详细属性数据（统计+进程诊断）
 ```
 结果同时写入 `dist\console-out.txt`（winexe 程序控制台输出受限，读文件为准）。
+
+## 代理属性
+
+- **修改属性**（按钮或列表右键）：名称、地址（支持远程代理服务器）、端口、协议、进程名、备注、单独测速 URL（留空用全局目标池）
+- **详细属性**：状态与延迟、添加日期、进程号/路径/启动时间/内存（实时查询）、端口实际归属进程、近 20 轮延迟迷你图、近 50 轮可用率、被选中次数、累计生效时长
+- 注：以 Windows 服务方式运行的代理内核，其路径/启动时间因系统权限限制可能显示 "-"
 
 ## 编译
 
