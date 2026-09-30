@@ -43,6 +43,7 @@ namespace ProxyDirector
         public int speedTimeoutSeconds { get; set; }
         public bool autoSwitch { get; set; }
         public bool speedWarmMeasure { get; set; }
+        public int speedWarmWaitSeconds { get; set; }
         public List<string> testUrls { get; set; }
         public List<ProxyEntry> proxies { get; set; }
 
@@ -56,6 +57,7 @@ namespace ProxyDirector
             c.speedTimeoutSeconds = 8;
             c.autoSwitch = true;
             c.speedWarmMeasure = true;
+            c.speedWarmWaitSeconds = 3;
             c.testUrls = new List<string>();
             c.testUrls.Add("https://www.gstatic.com/generate_204");
             c.testUrls.Add("http://www.msftconnecttest.com/connecttest.txt");
@@ -94,9 +96,12 @@ namespace ProxyDirector
                             if (p.testUrlOverride == null) p.testUrlOverride = "";
                             if (legacyEnabled) { p.enabled = true; dirty = true; }
                         }
-                        // 旧配置兼容: 无 speedWarmMeasure 字段时按默认预热方案处理(bool 缺省反序列化为 false)
+                        // 旧配置兼容: 无 speedWarmMeasure 字段时按默认预热方案处理(bool 缺省反序列化为 false);
+                        // 预热等待秒数缺省为 0(旧配置/无效值), 统一回补默认 3s
                         if (!raw.Contains("\"speedWarmMeasure\""))
                         { cfg.speedWarmMeasure = true; dirty = true; }
+                        if (cfg.speedWarmWaitSeconds <= 0)
+                        { cfg.speedWarmWaitSeconds = 3; dirty = true; }
                         if (dirty) Save(cfg);
                         return cfg;
                     }
@@ -312,12 +317,12 @@ namespace ProxyDirector
                     {
                         // 预热方案: 复用连接, 先发一次不计时请求焐热 本机->核心->节点 链路与 TLS 会话, 再计时第二次。
                         // 各代理(无论是否正在使用)同温可比, 数值与代理客户端自带测速同口径。
-                        // 预热请求即连通性测试: 超时/失败直接换下一目标, 保证计时请求必走热连接
+                        // 预热请求即连通性测试: 超时(可配置, 默认3s)/失败直接换下一目标, 保证计时请求必走热连接
                         hc.DefaultRequestHeaders.ConnectionClose = false;
                         try
                         {
                             var warm = hc.GetAsync(url);
-                            if (!warm.Wait(TimeSpan.FromSeconds(cfg.speedTimeoutSeconds))) continue;
+                            if (!warm.Wait(TimeSpan.FromSeconds(cfg.speedWarmWaitSeconds))) continue;
                             using (HttpResponseMessage wr = warm.Result)
                             {
                                 if (!wr.IsSuccessStatusCode) continue;
@@ -641,7 +646,7 @@ namespace ProxyDirector
             Logger.Log("自动切换: " + (on ? "启用" : "暂停"));
         }
 
-        public void UpdateSettings(int interval, int threshold, int dwell, bool warmMeasure)
+        public void UpdateSettings(int interval, int threshold, int dwell, bool warmMeasure, int warmWaitSeconds)
         {
             lock (_lock)
             {
@@ -649,6 +654,7 @@ namespace ProxyDirector
                 _cfg.switchThresholdPercent = threshold;
                 _cfg.minDwellMinutes = dwell;
                 _cfg.speedWarmMeasure = warmMeasure;
+                _cfg.speedWarmWaitSeconds = warmWaitSeconds;
             }
             ConfigStore.Save(_cfg);
         }
@@ -1444,20 +1450,21 @@ namespace ProxyDirector
     public class SettingsForm : Form
     {
         private ComboBox _schemeBox;
-        private NumericUpDown _intervalNum, _thresholdNum, _dwellNum;
+        private NumericUpDown _intervalNum, _thresholdNum, _dwellNum, _warmWaitNum;
         public int Interval;
         public int Threshold;
         public int Dwell;
         public bool WarmMeasure;
+        public int WarmWaitSeconds;
 
-        public SettingsForm(int interval, int threshold, int dwell, bool warm)
+        public SettingsForm(int interval, int threshold, int dwell, bool warm, int warmWait)
         {
             Text = "设置";
             Icon = MainForm.AppIcon;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false; MinimizeBox = false;
             StartPosition = FormStartPosition.CenterParent;
-            ClientSize = new Size(380, 216);
+            ClientSize = new Size(380, 228);
 
             Label l0 = new Label(); l0.Text = "测速方案:"; l0.AutoSize = true; l0.Location = new Point(12, 15); Controls.Add(l0);
             _schemeBox = new ComboBox(); _schemeBox.DropDownStyle = ComboBoxStyle.DropDownList;
@@ -1467,26 +1474,30 @@ namespace ProxyDirector
             _schemeBox.Location = new Point(90, 12); _schemeBox.Width = 276; Controls.Add(_schemeBox);
 
             Label hint = new Label();
-            hint.Text = "预热测速: 先发一次不计时的预热请求焐热链路, 再对第二次请求计时; 各代理同温可比, 数值与代理客户端自带测速同口径。\n冷连接测速: 每次全新连接单次计时(旧版行为), 省流量, 但正在使用的代理偏快、备用的偏冷, 比较有偏差。";
+            hint.Text = "预热测速: 先发一次不计时的预热请求焐热链路, 再对第二次请求计时; 各代理同温可比, 数值与代理客户端自带测速同口径。\n冷连接测速: 每次全新连接单次计时(旧版行为), 省流量, 但正在使用的代理偏快、备用的偏冷, 比较有偏差。\n预热等待: 预热请求最多等待秒数, 超过视为该目标失败并换下一目标。";
             hint.ForeColor = Color.DimGray;
-            hint.Location = new Point(12, 40); hint.Width = 356; hint.Height = 44; Controls.Add(hint);
+            hint.Location = new Point(12, 40); hint.Width = 356; hint.Height = 58; Controls.Add(hint);
 
-            Label l1 = new Label(); l1.Text = "周期(秒)"; l1.AutoSize = true; l1.Location = new Point(12, 100); Controls.Add(l1);
-            _intervalNum = new NumericUpDown(); _intervalNum.Location = new Point(90, 96); _intervalNum.Width = 70;
+            Label l1 = new Label(); l1.Text = "周期(秒)"; l1.AutoSize = true; l1.Location = new Point(12, 112); Controls.Add(l1);
+            _intervalNum = new NumericUpDown(); _intervalNum.Location = new Point(90, 108); _intervalNum.Width = 70;
             _intervalNum.Minimum = 15; _intervalNum.Maximum = 3600; _intervalNum.Value = interval; Controls.Add(_intervalNum);
 
-            Label l2 = new Label(); l2.Text = "阈值(%)"; l2.AutoSize = true; l2.Location = new Point(180, 100); Controls.Add(l2);
-            _thresholdNum = new NumericUpDown(); _thresholdNum.Location = new Point(240, 96); _thresholdNum.Width = 60;
+            Label l2 = new Label(); l2.Text = "阈值(%)"; l2.AutoSize = true; l2.Location = new Point(180, 112); Controls.Add(l2);
+            _thresholdNum = new NumericUpDown(); _thresholdNum.Location = new Point(240, 108); _thresholdNum.Width = 60;
             _thresholdNum.Minimum = 5; _thresholdNum.Maximum = 90; _thresholdNum.Value = threshold; Controls.Add(_thresholdNum);
 
-            Label l3 = new Label(); l3.Text = "停留(分)"; l3.AutoSize = true; l3.Location = new Point(12, 138); Controls.Add(l3);
-            _dwellNum = new NumericUpDown(); _dwellNum.Location = new Point(90, 134); _dwellNum.Width = 70;
+            Label l3 = new Label(); l3.Text = "停留(分)"; l3.AutoSize = true; l3.Location = new Point(12, 150); Controls.Add(l3);
+            _dwellNum = new NumericUpDown(); _dwellNum.Location = new Point(90, 146); _dwellNum.Width = 70;
             _dwellNum.Minimum = 1; _dwellNum.Maximum = 120; _dwellNum.Value = dwell; Controls.Add(_dwellNum);
 
-            Button ok = new Button(); ok.Text = "保存"; ok.Location = new Point(170, 174); ok.Width = 90;
+            Label l4 = new Label(); l4.Text = "预热等待(秒)"; l4.AutoSize = true; l4.Location = new Point(180, 150); Controls.Add(l4);
+            _warmWaitNum = new NumericUpDown(); _warmWaitNum.Location = new Point(272, 146); _warmWaitNum.Width = 55;
+            _warmWaitNum.Minimum = 1; _warmWaitNum.Maximum = 30; _warmWaitNum.Value = warmWait; Controls.Add(_warmWaitNum);
+
+            Button ok = new Button(); ok.Text = "保存"; ok.Location = new Point(170, 186); ok.Width = 90;
             ok.Click += OnOk; Controls.Add(ok);
             Button cancel = new Button(); cancel.Text = "取消"; cancel.DialogResult = DialogResult.Cancel;
-            cancel.Location = new Point(272, 174); cancel.Width = 90; Controls.Add(cancel);
+            cancel.Location = new Point(272, 186); cancel.Width = 90; Controls.Add(cancel);
             AcceptButton = ok; CancelButton = cancel;
         }
 
@@ -1496,6 +1507,7 @@ namespace ProxyDirector
             Threshold = (int)_thresholdNum.Value;
             Dwell = (int)_dwellNum.Value;
             WarmMeasure = _schemeBox.SelectedIndex == 0;
+            WarmWaitSeconds = (int)_warmWaitNum.Value;
             DialogResult = DialogResult.OK;
             Close();
         }
@@ -1922,12 +1934,13 @@ namespace ProxyDirector
                 (int)ClampNum(_cfg.checkIntervalSeconds, 15, 3600),
                 (int)ClampNum(_cfg.switchThresholdPercent, 5, 90),
                 (int)ClampNum(_cfg.minDwellMinutes, 1, 120),
-                _cfg.speedWarmMeasure))
+                _cfg.speedWarmMeasure,
+                (int)ClampNum(_cfg.speedWarmWaitSeconds, 1, 30)))
             {
                 if (f.ShowDialog(this) != DialogResult.OK) return;
-                _engine.UpdateSettings(f.Interval, f.Threshold, f.Dwell, f.WarmMeasure);
+                _engine.UpdateSettings(f.Interval, f.Threshold, f.Dwell, f.WarmMeasure, f.WarmWaitSeconds);
                 Logger.Log("用户保存设置: 周期=" + f.Interval + "s 阈值=" + f.Threshold + "% 停留=" + f.Dwell
-                           + "分 测速方案=" + (f.WarmMeasure ? "预热" : "冷连接"));
+                           + "分 测速方案=" + (f.WarmMeasure ? "预热(等待" + f.WarmWaitSeconds + "s)" : "冷连接"));
                 MessageBox.Show("设置已保存");
             }
         }
