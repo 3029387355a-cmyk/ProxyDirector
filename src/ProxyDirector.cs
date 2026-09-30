@@ -1548,6 +1548,7 @@ namespace ProxyDirector
 
             Text = "ProxyDirector — 本地多代理自动择优";
             ClientSize = new Size(880, 540);
+            MinimumSize = new Size(920, 540);
             StartPosition = FormStartPosition.CenterScreen;
             Icon = AppIcon;
 
@@ -1567,6 +1568,16 @@ namespace ProxyDirector
             _lv = new ListView();
             _lv.View = View.Details; _lv.FullRowSelect = true; _lv.GridLines = true;
             _lv.Location = new Point(12, 12); _lv.Size = new Size(856, 300);
+            _lv.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            _lv.Resize += delegate
+            {
+                // 详情列(第7列)吸收水平方向的剩余宽度, 最小保留初始宽度
+                int others = 0;
+                for (int i = 0; i < _lv.Columns.Count; i++) if (i != 6) others += _lv.Columns[i].Width;
+                int want = _lv.ClientSize.Width - others - 6;
+                if (want < 236) want = 236;
+                if (_lv.Columns[6].Width != want) _lv.Columns[6].Width = want;
+            };
             _lv.Columns.Add("生效", 58);
             _lv.Columns.Add("名称", 140);
             _lv.Columns.Add("地址", 120);
@@ -1585,6 +1596,10 @@ namespace ProxyDirector
             _toggleBtn = MkBtn("禁用", 432, 316, OnToggleEnable);
             _delBtn = MkBtn("删除", 532, 316, OnDel);
             _pauseBtn = MkBtn("暂停自动切换", 652, 316, OnPauseToggle);
+
+            // 底部操作区整体锚定窗口底部(与列表的 Bottom 锚定联动: 窗口伸缩只改变列表高度)
+            foreach (Control c in new Control[] { _addBtn, _testBtn, _rescanBtn, _switchBtn, _toggleBtn, _delBtn, _pauseBtn })
+                c.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
 
             // 列表右键菜单
             ContextMenu cm = new ContextMenu();
@@ -1623,14 +1638,17 @@ namespace ProxyDirector
                 OnUiTick(null, EventArgs.Empty);
             };
 
-            MkBtn("设置", 12, 354, OnOpenSettings);
-            MkBtn("打开日志", 112, 354, OnOpenLog);
+            Button settingsBtn = MkBtn("设置", 12, 354, OnOpenSettings);
+            Button logBtn = MkBtn("打开日志", 112, 354, OnOpenLog);
+            settingsBtn.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+            logBtn.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
 
             // 开机自启开关 (注册表 Run 项为唯一事实来源, 启动时读实际状态)
             _autostartBox = new CheckBox();
             _autostartBox.Text = "开机自启";
             _autostartBox.AutoSize = true;
             _autostartBox.Location = new Point(672, 360);
+            _autostartBox.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
             _autostartBox.Checked = IsAutostartEnabled();
             _autostartBox.CheckedChanged += OnAutostartToggle;
             Controls.Add(_autostartBox);
@@ -1638,6 +1656,7 @@ namespace ProxyDirector
             Label note = new Label();
             note.Text = "使用前提: 关闭各代理客户端的\"系统代理\"开关, 由本工具独占管理系统代理。 关闭窗口 = 最小化到托盘; 退出请用托盘图标右键 -> 退出。\n行级操作(切到/禁用/删除/详细属性/修改属性)请先选中列表行, 或使用右键菜单。";
             note.ForeColor = Color.DimGray; note.AutoSize = true; note.Location = new Point(12, 392);
+            note.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
             Controls.Add(note);
 
             _status = new StatusStrip();
