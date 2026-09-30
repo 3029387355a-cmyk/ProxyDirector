@@ -1564,7 +1564,8 @@ namespace ProxyDirector
         private void BuildTray()
         {
             _tray = new NotifyIcon();
-            _tray.Icon = SystemIcons.Application;
+            try { _tray.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); }
+            catch { _tray.Icon = SystemIcons.Application; }
             _tray.Text = "ProxyDirector";
             _tray.Visible = true;
             MenuItem showItem = new MenuItem("显示主窗口", delegate(object s, EventArgs e) { Show(); Activate(); });

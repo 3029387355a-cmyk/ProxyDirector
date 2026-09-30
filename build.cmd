@@ -6,6 +6,7 @@ set OUT=%~dp0dist
 if not exist "%OUT%" mkdir "%OUT%"
 
 "%CSC%" /nologo /target:winexe /optimize+ /out:"%OUT%\ProxyDirector.exe" ^
+  /win32icon:"%~dp0src\ProxyDirector.ico" ^
   /r:System.Windows.Forms.dll ^
   /r:System.Drawing.dll ^
   /r:System.Net.Http.dll ^

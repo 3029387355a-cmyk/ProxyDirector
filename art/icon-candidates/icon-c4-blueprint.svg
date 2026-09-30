@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512" width="512" height="512">
+  <title>候选4 · 蓝图线稿 · 正对跑道双机分航</title>
+  <defs>
+    <pattern id="gridS" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32,0 H0 V32" fill="none" stroke="#ffffff" stroke-opacity="0.05" stroke-width="1"/>
+    </pattern>
+    <pattern id="gridL" width="128" height="128" patternUnits="userSpaceOnUse">
+      <path d="M128,0 H0 V128" fill="none" stroke="#cfe8ff" stroke-opacity="0.10" stroke-width="1.5"/>
+    </pattern>
+    <pattern id="hatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <line x1="0" y1="0" x2="0" y2="10" stroke="#9cc8ee" stroke-width="1.6" stroke-opacity="0.28"/>
+    </pattern>
+    <path id="jet" d="M85,0 C80,-6 60,-9 40,-9 L-44,-9 L-68,-34 L-78,-34 L-72,-7 L-80,-2 L-80,3 L-62,8 L25,9 C55,9 76,6 85,0 Z M22,3 L-22,30 L-40,30 L-4,3 Z M14,-8 L-14,-26 L-30,-26 L-4,-8 Z M-58,2 L-74,16 L-84,16 L-68,2 Z M0,12 L30,12 L30,21 L0,21 Z"/>
+  </defs>
+
+  <rect x="0" y="0" width="512" height="512" rx="96" fill="#10395c"/>
+  <rect x="0" y="0" width="512" height="512" rx="96" fill="url(#gridS)"/>
+  <rect x="0" y="0" width="512" height="512" rx="96" fill="url(#gridL)"/>
+
+  <!-- drawing frame -->
+  <rect x="24" y="24" width="464" height="464" fill="none" stroke="#cfe8ff" stroke-opacity="0.5" stroke-width="2"/>
+  <rect x="32" y="32" width="448" height="448" fill="none" stroke="#cfe8ff" stroke-opacity="0.25" stroke-width="1"/>
+
+  <!-- registration crosshairs -->
+  <g stroke="#cfe8ff" stroke-opacity="0.3" stroke-width="1.5">
+    <path d="M100,110 H116 M108,102 V118"/>
+    <path d="M396,84 H412 M404,76 V92"/>
+    <path d="M72,196 H88 M80,188 V204"/>
+  </g>
+
+  <!-- skyline outlines on horizon -->
+  <g fill="none" stroke="#d8ecff" stroke-width="2.5">
+    <rect x="56" y="222" width="92" height="24"/>
+    <rect x="414" y="202" width="10" height="44"/>
+    <rect x="406" y="192" width="26" height="12"/>
+    <line x1="419" y1="192" x2="419" y2="176"/>
+  </g>
+  <circle cx="419" cy="174" r="2.5" fill="#d8ecff"/>
+  <line x1="32" y1="246" x2="480" y2="246" stroke="#d8ecff" stroke-opacity="0.35" stroke-width="1.5"/>
+
+  <!-- runway in perspective (hatched) -->
+  <path d="M96,512 L244,252 L268,252 L416,512 Z" fill="url(#hatch)"/>
+  <path d="M96,512 L244,252 L268,252 L416,512 Z" fill="none" stroke="#d8ecff" stroke-width="3"/>
+  <line x1="104" y1="504" x2="246" y2="258" stroke="#d8ecff" stroke-width="2"/>
+  <line x1="408" y1="504" x2="266" y2="258" stroke="#d8ecff" stroke-width="2"/>
+  <g stroke="#d8ecff" stroke-linecap="round">
+    <line x1="256" y1="470" x2="256" y2="500" stroke-width="9"/>
+    <line x1="256" y1="428" x2="256" y2="454" stroke-width="7.5"/>
+    <line x1="256" y1="392" x2="256" y2="414" stroke-width="6.5"/>
+    <line x1="256" y1="362" x2="256" y2="380" stroke-width="5.5"/>
+    <line x1="256" y1="336" x2="256" y2="350" stroke-width="4.5"/>
+    <line x1="256" y1="314" x2="256" y2="324" stroke-width="3.6"/>
+    <line x1="256" y1="296" x2="256" y2="303" stroke-width="2.8"/>
+    <line x1="256" y1="281" x2="256" y2="287" stroke-width="2.2"/>
+  </g>
+  <g fill="#d8ecff">
+    <rect x="106" y="494" width="24" height="18"/>
+    <rect x="146" y="494" width="24" height="18"/>
+    <rect x="186" y="494" width="24" height="18"/>
+    <rect x="226" y="494" width="24" height="18"/>
+    <rect x="266" y="494" width="24" height="18"/>
+    <rect x="306" y="494" width="24" height="18"/>
+    <rect x="346" y="494" width="24" height="18"/>
+    <rect x="386" y="494" width="24" height="18"/>
+  </g>
+
+  <!-- vanishing-point crosshair at the runway end -->
+  <g stroke="#ffffff" stroke-width="2">
+    <path d="M244,257 H268 M256,245 V269" fill="none"/>
+    <circle cx="256" cy="257" r="7" fill="none"/>
+  </g>
+
+  <!-- white trajectories from runway end -->
+  <g fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="18 9 4 9">
+    <path d="M256,257 C300,236 322,204 331,167"/>
+    <path d="M256,257 C230,248 206,238 185,221"/>
+  </g>
+
+  <!-- planes: technical outline -->
+  <use href="#jet" xlink:href="#jet" transform="translate(388,148) rotate(-10) scale(0.8)" fill="none" stroke="#eaf6ff" stroke-width="3" stroke-linejoin="round"/>
+  <use href="#jet" xlink:href="#jet" transform="translate(128,208) scale(-0.68,0.68) rotate(-8)" fill="none" stroke="#eaf6ff" stroke-width="3.5" stroke-linejoin="round"/>
+</svg>

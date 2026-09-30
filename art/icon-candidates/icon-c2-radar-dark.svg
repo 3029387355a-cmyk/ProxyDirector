@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512" width="512" height="512">
+  <title>候选2 · 暗色雷达 · 正对跑道双机分航</title>
+  <defs>
+    <radialGradient id="glowC" cx="0.5" cy="0.5" r="0.65">
+      <stop offset="0" stop-color="#0ea5e9" stop-opacity="0.20"/>
+      <stop offset="1" stop-color="#0ea5e9" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="sweepG" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#38bdf8" stop-opacity="0.20"/>
+      <stop offset="1" stop-color="#38bdf8" stop-opacity="0"/>
+    </linearGradient>
+    <clipPath id="rounded"><rect x="0" y="0" width="512" height="512" rx="72"/></clipPath>
+    <path id="jet" d="M85,0 C80,-6 60,-9 40,-9 L-44,-9 L-68,-34 L-78,-34 L-72,-7 L-80,-2 L-80,3 L-62,8 L25,9 C55,9 76,6 85,0 Z M22,3 L-22,30 L-40,30 L-4,3 Z M14,-8 L-14,-26 L-30,-26 L-4,-8 Z M-58,2 L-74,16 L-84,16 L-68,2 Z M0,12 L30,12 L30,21 L0,21 Z"/>
+  </defs>
+
+  <rect x="0" y="0" width="512" height="512" rx="72" fill="#0b1220"/>
+  <rect x="0" y="0" width="512" height="512" rx="72" fill="url(#glowC)"/>
+
+  <g clip-path="url(#rounded)">
+
+  <!-- radar rings centered on the runway far end -->
+  <g fill="none" stroke="#38bdf8">
+    <circle cx="256" cy="256" r="60" stroke-opacity="0.16" stroke-width="2"/>
+    <circle cx="256" cy="256" r="120" stroke-opacity="0.13" stroke-width="2"/>
+    <circle cx="256" cy="256" r="180" stroke-opacity="0.10" stroke-width="2"/>
+    <circle cx="256" cy="256" r="240" stroke-opacity="0.08" stroke-width="2"/>
+    <line x1="256" y1="16" x2="256" y2="496" stroke-opacity="0.10"/>
+    <line x1="16" y1="256" x2="496" y2="256" stroke-opacity="0.10"/>
+  </g>
+  <path d="M256,256 L256,16 A240,240 0 0 1 464,136 Z" fill="url(#sweepG)"/>
+
+  <!-- HUD corner brackets -->
+  <g fill="none" stroke="#38bdf8" stroke-opacity="0.35" stroke-width="3">
+    <path d="M30,74 V30 H74"/>
+    <path d="M438,30 H482 V74"/>
+    <path d="M482,438 V482 H438"/>
+    <path d="M74,482 H30 V438"/>
+  </g>
+
+  <!-- antenna masts on horizon -->
+  <g stroke="#38bdf8" stroke-opacity="0.35" stroke-width="2.5">
+    <line x1="120" y1="246" x2="120" y2="210"/>
+    <line x1="400" y1="246" x2="400" y2="198"/>
+  </g>
+  <circle cx="120" cy="208" r="3" fill="#38bdf8" opacity="0.6"/>
+  <circle cx="400" cy="196" r="3" fill="#38bdf8" opacity="0.6"/>
+
+  <!-- ground + runway in perspective -->
+  <rect x="0" y="246" width="512" height="266" fill="#0d1526"/>
+  <path d="M96,512 L244,252 L268,252 L416,512 Z" fill="#101a2e"/>
+  <line x1="104" y1="504" x2="246" y2="258" stroke="#38bdf8" stroke-width="6" opacity="0.15"/>
+  <line x1="104" y1="504" x2="246" y2="258" stroke="#a5e6ff" stroke-width="2.5" opacity="0.8"/>
+  <line x1="408" y1="504" x2="266" y2="258" stroke="#38bdf8" stroke-width="6" opacity="0.15"/>
+  <line x1="408" y1="504" x2="266" y2="258" stroke="#a5e6ff" stroke-width="2.5" opacity="0.8"/>
+  <line x1="244" y1="252" x2="268" y2="252" stroke="#a5e6ff" stroke-width="3"/>
+  <g stroke="#a5e6ff" stroke-linecap="round" opacity="0.9">
+    <line x1="256" y1="470" x2="256" y2="500" stroke-width="10"/>
+    <line x1="256" y1="428" x2="256" y2="454" stroke-width="8"/>
+    <line x1="256" y1="392" x2="256" y2="414" stroke-width="7"/>
+    <line x1="256" y1="362" x2="256" y2="380" stroke-width="6"/>
+    <line x1="256" y1="336" x2="256" y2="350" stroke-width="5"/>
+    <line x1="256" y1="314" x2="256" y2="324" stroke-width="4"/>
+    <line x1="256" y1="296" x2="256" y2="303" stroke-width="3"/>
+    <line x1="256" y1="281" x2="256" y2="287" stroke-width="2.5"/>
+  </g>
+  <g fill="#a5e6ff" opacity="0.85">
+    <rect x="106" y="494" width="24" height="18"/>
+    <rect x="146" y="494" width="24" height="18"/>
+    <rect x="186" y="494" width="24" height="18"/>
+    <rect x="226" y="494" width="24" height="18"/>
+    <rect x="266" y="494" width="24" height="18"/>
+    <rect x="306" y="494" width="24" height="18"/>
+    <rect x="346" y="494" width="24" height="18"/>
+    <rect x="386" y="494" width="24" height="18"/>
+  </g>
+
+  <!-- white trajectories from runway end -->
+  <g fill="none" stroke-linecap="round">
+    <path d="M256,257 C300,236 322,204 331,167" stroke="#ffffff" stroke-width="14" opacity="0.18"/>
+    <path d="M256,257 C300,236 322,204 331,167" stroke="#ffffff" stroke-width="6"/>
+    <path d="M256,257 C230,248 206,238 185,221" stroke="#ffffff" stroke-width="14" opacity="0.18"/>
+    <path d="M256,257 C230,248 206,238 185,221" stroke="#ffffff" stroke-width="6"/>
+  </g>
+  <circle cx="256" cy="257" r="6" fill="#ffffff"/>
+
+  <!-- planes: front (cyan, right), rear (amber, left) -->
+  <use href="#jet" xlink:href="#jet" transform="translate(388,148) rotate(-10) scale(0.8)" fill="#22d3ee"/>
+  <use href="#jet" xlink:href="#jet" transform="translate(128,208) scale(-0.68,0.68) rotate(-8)" fill="#fbbf24"/>
+  </g>
+</svg>

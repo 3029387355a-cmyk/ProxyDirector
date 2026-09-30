@@ -6,3 +6,6 @@ runtime/
 config.json
 *.log
 stop.flag
+
+# 图标渲染中间产物
+art/**/*.png
