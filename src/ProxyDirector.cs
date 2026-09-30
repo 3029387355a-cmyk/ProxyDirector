@@ -1519,6 +1519,7 @@ namespace ProxyDirector
         private StatusStrip _status;
         private ToolStripStatusLabel _stCurrent, _stNext, _stDecision, _stSys;
         private int _sortCol = -1;   // 当前列头排序(-1 = 配置顺序)
+        private bool _sortAsc = true;   // 排序方向: 同列再次点击切换正/倒序
         private NotifyIcon _tray;
         private System.Windows.Forms.Timer _uiTimer;
         private bool _reallyExit = false;
@@ -1566,13 +1567,13 @@ namespace ProxyDirector
             _lv = new ListView();
             _lv.View = View.Details; _lv.FullRowSelect = true; _lv.GridLines = true;
             _lv.Location = new Point(12, 12); _lv.Size = new Size(856, 300);
-            _lv.Columns.Add("生效", 44);
+            _lv.Columns.Add("生效", 58);
             _lv.Columns.Add("名称", 140);
             _lv.Columns.Add("地址", 120);
             _lv.Columns.Add("协议", 60);
             _lv.Columns.Add("延迟", 70);
             _lv.Columns.Add("状态", 90);
-            _lv.Columns.Add("详情", 250);
+            _lv.Columns.Add("详情", 236);
             _lv.Columns.Add("进程", 100);
             Controls.Add(_lv);
 
@@ -1613,10 +1614,12 @@ namespace ProxyDirector
             _lv.SelectedIndexChanged += delegate { RefreshRowBtnStates(); };
             RefreshRowBtnStates();
 
-            // 点击列头排序(固定方向, 规则见 ProxyRowComparer)
+            // 点击列头排序: 首次点击正序, 再次点击同列倒序, 循环切换; 列头 ▲/▼ 指示方向
             _lv.ColumnClick += delegate(object s, ColumnClickEventArgs e)
             {
-                _sortCol = e.Column;
+                if (_sortCol == e.Column) _sortAsc = !_sortAsc;
+                else { _sortCol = e.Column; _sortAsc = true; }
+                SetSortArrow();
                 OnUiTick(null, EventArgs.Empty);
             };
 
@@ -1667,14 +1670,15 @@ namespace ProxyDirector
         private class ProxyRowComparer : System.Collections.IComparer
         {
             private int _col;
+            private bool _asc;
             private string _warmingName;
             private Dictionary<string, ProxyState> _byName;
             private Dictionary<string, int> _order;
 
-            public ProxyRowComparer(int col, string warmingName,
+            public ProxyRowComparer(int col, bool asc, string warmingName,
                 Dictionary<string, ProxyState> byName, Dictionary<string, int> order)
             {
-                _col = col; _warmingName = warmingName; _byName = byName; _order = order;
+                _col = col; _asc = asc; _warmingName = warmingName; _byName = byName; _order = order;
             }
 
             public int Compare(object x, object y)
@@ -1715,6 +1719,8 @@ namespace ProxyDirector
                         r = string.Compare(sa.cfg.processName ?? "", sb.cfg.processName ?? "", StringComparison.CurrentCultureIgnoreCase);
                         break;
                 }
+                // 倒序仅反转主排序键, 兜底的配置顺序保持正序(每秒刷新稳定)
+                if (!_asc && r != 0) r = -r;
                 if (r == 0)
                 {
                     int ia, ib;
@@ -1723,6 +1729,17 @@ namespace ProxyDirector
                     r = ia - ib;   // 稳定兜底: 回到配置顺序, 避免每秒抖动
                 }
                 return r;
+            }
+        }
+
+        // 列头方向指示: 当前列追加 ▲/▼, 其余列剥掉旧箭头
+        private void SetSortArrow()
+        {
+            for (int i = 0; i < _lv.Columns.Count; i++)
+            {
+                string name = _lv.Columns[i].Text;
+                if (name.EndsWith(" ▲") || name.EndsWith(" ▼")) name = name.Substring(0, name.Length - 2);
+                _lv.Columns[i].Text = (i == _sortCol) ? name + (_sortAsc ? " ▲" : " ▼") : name;
             }
         }
 
@@ -1844,7 +1861,7 @@ namespace ProxyDirector
             }
             if (_sortCol >= 0)
             {
-                _lv.ListViewItemSorter = new ProxyRowComparer(_sortCol, s.warmingName, byName, byOrder);
+                _lv.ListViewItemSorter = new ProxyRowComparer(_sortCol, _sortAsc, s.warmingName, byName, byOrder);
             }
             _lv.EndUpdate();
 
