@@ -1464,40 +1464,35 @@ namespace ProxyDirector
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false; MinimizeBox = false;
             StartPosition = FormStartPosition.CenterParent;
-            ClientSize = new Size(380, 228);
+            ClientSize = new Size(380, 210);
 
             Label l0 = new Label(); l0.Text = "测速方案:"; l0.AutoSize = true; l0.Location = new Point(12, 15); Controls.Add(l0);
             _schemeBox = new ComboBox(); _schemeBox.DropDownStyle = ComboBoxStyle.DropDownList;
             _schemeBox.Items.Add("预热测速（默认）");
             _schemeBox.Items.Add("冷连接测速");
             _schemeBox.SelectedIndex = warm ? 0 : 1;
-            _schemeBox.Location = new Point(90, 12); _schemeBox.Width = 276; Controls.Add(_schemeBox);
+            _schemeBox.Location = new Point(110, 12); _schemeBox.Width = 256; Controls.Add(_schemeBox);
 
-            Label hint = new Label();
-            hint.Text = "预热测速: 先发一次不计时的预热请求焐热链路, 再对第二次请求计时; 各代理同温可比, 数值与代理客户端自带测速同口径。\n冷连接测速: 每次全新连接单次计时(旧版行为), 省流量, 但正在使用的代理偏快、备用的偏冷, 比较有偏差。\n预热等待: 预热请求最多等待秒数, 超过视为该目标失败并换下一目标。";
-            hint.ForeColor = Color.DimGray;
-            hint.Location = new Point(12, 40); hint.Width = 356; hint.Height = 58; Controls.Add(hint);
-
-            Label l1 = new Label(); l1.Text = "周期(秒)"; l1.AutoSize = true; l1.Location = new Point(12, 112); Controls.Add(l1);
-            _intervalNum = new NumericUpDown(); _intervalNum.Location = new Point(90, 108); _intervalNum.Width = 70;
-            _intervalNum.Minimum = 15; _intervalNum.Maximum = 3600; _intervalNum.Value = interval; Controls.Add(_intervalNum);
-
-            Label l2 = new Label(); l2.Text = "阈值(%)"; l2.AutoSize = true; l2.Location = new Point(180, 112); Controls.Add(l2);
-            _thresholdNum = new NumericUpDown(); _thresholdNum.Location = new Point(240, 108); _thresholdNum.Width = 60;
-            _thresholdNum.Minimum = 5; _thresholdNum.Maximum = 90; _thresholdNum.Value = threshold; Controls.Add(_thresholdNum);
-
-            Label l3 = new Label(); l3.Text = "停留(分)"; l3.AutoSize = true; l3.Location = new Point(12, 150); Controls.Add(l3);
-            _dwellNum = new NumericUpDown(); _dwellNum.Location = new Point(90, 146); _dwellNum.Width = 70;
-            _dwellNum.Minimum = 1; _dwellNum.Maximum = 120; _dwellNum.Value = dwell; Controls.Add(_dwellNum);
-
-            Label l4 = new Label(); l4.Text = "预热等待(秒)"; l4.AutoSize = true; l4.Location = new Point(180, 150); Controls.Add(l4);
-            _warmWaitNum = new NumericUpDown(); _warmWaitNum.Location = new Point(272, 146); _warmWaitNum.Width = 55;
+            Label l4 = new Label(); l4.Text = "预热等待(秒)"; l4.AutoSize = true; l4.Location = new Point(12, 55); Controls.Add(l4);
+            _warmWaitNum = new NumericUpDown(); _warmWaitNum.Location = new Point(110, 52); _warmWaitNum.Width = 70;
             _warmWaitNum.Minimum = 1; _warmWaitNum.Maximum = 30; _warmWaitNum.Value = warmWait; Controls.Add(_warmWaitNum);
 
-            Button ok = new Button(); ok.Text = "保存"; ok.Location = new Point(170, 186); ok.Width = 90;
+            Label l1 = new Label(); l1.Text = "周期(秒)"; l1.AutoSize = true; l1.Location = new Point(12, 95); Controls.Add(l1);
+            _intervalNum = new NumericUpDown(); _intervalNum.Location = new Point(110, 92); _intervalNum.Width = 70;
+            _intervalNum.Minimum = 15; _intervalNum.Maximum = 3600; _intervalNum.Value = interval; Controls.Add(_intervalNum);
+
+            Label l2 = new Label(); l2.Text = "阈值(%)"; l2.AutoSize = true; l2.Location = new Point(200, 95); Controls.Add(l2);
+            _thresholdNum = new NumericUpDown(); _thresholdNum.Location = new Point(270, 92); _thresholdNum.Width = 60;
+            _thresholdNum.Minimum = 5; _thresholdNum.Maximum = 90; _thresholdNum.Value = threshold; Controls.Add(_thresholdNum);
+
+            Label l3 = new Label(); l3.Text = "停留(分)"; l3.AutoSize = true; l3.Location = new Point(12, 133); Controls.Add(l3);
+            _dwellNum = new NumericUpDown(); _dwellNum.Location = new Point(110, 130); _dwellNum.Width = 70;
+            _dwellNum.Minimum = 1; _dwellNum.Maximum = 120; _dwellNum.Value = dwell; Controls.Add(_dwellNum);
+
+            Button ok = new Button(); ok.Text = "保存"; ok.Location = new Point(170, 170); ok.Width = 90;
             ok.Click += OnOk; Controls.Add(ok);
             Button cancel = new Button(); cancel.Text = "取消"; cancel.DialogResult = DialogResult.Cancel;
-            cancel.Location = new Point(272, 186); cancel.Width = 90; Controls.Add(cancel);
+            cancel.Location = new Point(272, 170); cancel.Width = 90; Controls.Add(cancel);
             AcceptButton = ok; CancelButton = cancel;
         }
 
