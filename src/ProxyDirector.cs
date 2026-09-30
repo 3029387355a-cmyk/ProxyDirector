@@ -1468,8 +1468,8 @@ namespace ProxyDirector
 
             Label l0 = new Label(); l0.Text = "测速方案:"; l0.AutoSize = true; l0.Location = new Point(12, 15); Controls.Add(l0);
             _schemeBox = new ComboBox(); _schemeBox.DropDownStyle = ComboBoxStyle.DropDownList;
-            _schemeBox.Items.Add("预热测速 (默认, 推荐)");
-            _schemeBox.Items.Add("冷连接测速 (省流量)");
+            _schemeBox.Items.Add("预热测速（默认）");
+            _schemeBox.Items.Add("冷连接测速");
             _schemeBox.SelectedIndex = warm ? 0 : 1;
             _schemeBox.Location = new Point(90, 12); _schemeBox.Width = 276; Controls.Add(_schemeBox);
 
