@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512" width="512" height="512">
+  <title>B1 · 暗色雷达 · 加粗基准(当前已内嵌版)</title>
+  <defs>
+    <radialGradient id="glowC" cx="0.5" cy="0.5" r="0.65">
+      <stop offset="0" stop-color="#0ea5e9" stop-opacity="0.20"/>
+      <stop offset="1" stop-color="#0ea5e9" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="sweepG" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#38bdf8" stop-opacity="0.20"/>
+      <stop offset="1" stop-color="#38bdf8" stop-opacity="0"/>
+    </linearGradient>
+    <clipPath id="rounded"><rect x="0" y="0" width="512" height="512" rx="72"/></clipPath>
+    <path id="jet" d="M85,0 C80,-6 60,-9 40,-9 L-44,-9 L-68,-34 L-78,-34 L-72,-7 L-80,-2 L-80,3 L-62,8 L25,9 C55,9 76,6 85,0 Z M22,3 L-22,30 L-40,30 L-4,3 Z M14,-8 L-14,-26 L-30,-26 L-4,-8 Z M-58,2 L-74,16 L-84,16 L-68,2 Z M0,12 L30,12 L30,21 L0,21 Z"/>
+  </defs>
+
+  <rect x="0" y="0" width="512" height="512" rx="72" fill="#0b1220"/>
+  <rect x="0" y="0" width="512" height="512" rx="72" fill="url(#glowC)"/>
+
+  <g clip-path="url(#rounded)">
+
+  <g fill="none" stroke="#38bdf8" stroke-width="3.5">
+    <circle cx="256" cy="256" r="60" stroke-opacity="0.18"/>
+    <circle cx="256" cy="256" r="120" stroke-opacity="0.15"/>
+    <circle cx="256" cy="256" r="180" stroke-opacity="0.12"/>
+    <circle cx="256" cy="256" r="240" stroke-opacity="0.10"/>
+    <line x1="256" y1="16" x2="256" y2="496" stroke-opacity="0.10"/>
+    <line x1="16" y1="256" x2="496" y2="256" stroke-opacity="0.10"/>
+  </g>
+  <path d="M256,256 L256,16 A240,240 0 0 1 464,136 Z" fill="url(#sweepG)"/>
+
+  <g fill="none" stroke="#38bdf8" stroke-opacity="0.4" stroke-width="5">
+    <path d="M30,74 V30 H74"/>
+    <path d="M438,30 H482 V74"/>
+    <path d="M482,438 V482 H438"/>
+    <path d="M74,482 H30 V438"/>
+  </g>
+
+  <g stroke="#38bdf8" stroke-opacity="0.4" stroke-width="4">
+    <line x1="120" y1="246" x2="120" y2="210"/>
+    <line x1="400" y1="246" x2="400" y2="198"/>
+  </g>
+  <circle cx="120" cy="207" r="4.5" fill="#38bdf8" opacity="0.6"/>
+  <circle cx="400" cy="195" r="4.5" fill="#38bdf8" opacity="0.6"/>
+
+  <rect x="0" y="246" width="512" height="266" fill="#0d1526"/>
+  <path d="M96,512 L244,252 L268,252 L416,512 Z" fill="#101a2e"/>
+  <line x1="104" y1="504" x2="246" y2="258" stroke="#38bdf8" stroke-width="11" opacity="0.18"/>
+  <line x1="104" y1="504" x2="246" y2="258" stroke="#a5e6ff" stroke-width="5.5" opacity="0.9"/>
+  <line x1="408" y1="504" x2="266" y2="258" stroke="#38bdf8" stroke-width="11" opacity="0.18"/>
+  <line x1="408" y1="504" x2="266" y2="258" stroke="#a5e6ff" stroke-width="5.5" opacity="0.9"/>
+  <line x1="244" y1="252" x2="268" y2="252" stroke="#a5e6ff" stroke-width="6"/>
+  <g stroke="#a5e6ff" stroke-linecap="round" opacity="0.95">
+    <line x1="256" y1="468" x2="256" y2="502" stroke-width="16"/>
+    <line x1="256" y1="416" x2="256" y2="448" stroke-width="13"/>
+    <line x1="256" y1="372" x2="256" y2="400" stroke-width="11"/>
+    <line x1="256" y1="334" x2="256" y2="358" stroke-width="9"/>
+    <line x1="256" y1="302" x2="256" y2="322" stroke-width="7"/>
+    <line x1="256" y1="278" x2="256" y2="294" stroke-width="6"/>
+  </g>
+  <g fill="#a5e6ff" opacity="0.9">
+    <rect x="104" y="486" width="34" height="26"/>
+    <rect x="160" y="486" width="34" height="26"/>
+    <rect x="215" y="486" width="34" height="26"/>
+    <rect x="271" y="486" width="34" height="26"/>
+    <rect x="326" y="486" width="34" height="26"/>
+    <rect x="382" y="486" width="34" height="26"/>
+  </g>
+
+  <g fill="none" stroke-linecap="round">
+    <path d="M256,257 C298,236 312,200 318,166" stroke="#ffffff" stroke-width="22" opacity="0.2"/>
+    <path d="M256,257 C298,236 312,200 318,166" stroke="#ffffff" stroke-width="10"/>
+    <path d="M256,257 C230,248 206,236 190,220" stroke="#ffffff" stroke-width="22" opacity="0.2"/>
+    <path d="M256,257 C230,248 206,236 190,220" stroke="#ffffff" stroke-width="10"/>
+  </g>
+  <circle cx="256" cy="257" r="9" fill="#ffffff"/>
+
+  <use href="#jet" xlink:href="#jet" transform="translate(388,148) rotate(-10) scale(0.95)" fill="#22d3ee" stroke="#22d3ee" stroke-width="10" stroke-linejoin="round"/>
+  <use href="#jet" xlink:href="#jet" transform="translate(128,208) scale(-0.82,0.82) rotate(-8)" fill="#fbbf24" stroke="#fbbf24" stroke-width="10" stroke-linejoin="round"/>
+
+  </g>
+</svg>
