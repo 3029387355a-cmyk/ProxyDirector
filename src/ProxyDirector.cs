@@ -969,6 +969,7 @@ namespace ProxyDirector
         public AddProxyForm()
         {
             Text = "添加代理";
+            Icon = MainForm.AppIcon;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false; MinimizeBox = false;
             StartPosition = FormStartPosition.CenterParent;
@@ -1130,6 +1131,7 @@ namespace ProxyDirector
         public EditProxyForm(ProxyEntry src)
         {
             Text = "修改属性 - " + src.name;
+            Icon = MainForm.AppIcon;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false; MinimizeBox = false;
             StartPosition = FormStartPosition.CenterParent;
@@ -1211,6 +1213,7 @@ namespace ProxyDirector
             _engine = engine;
             _name = proxyName;
             Text = "详细属性 - " + proxyName;
+            Icon = MainForm.AppIcon;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false; MinimizeBox = false;
             StartPosition = FormStartPosition.CenterParent;
@@ -1427,6 +1430,21 @@ namespace ProxyDirector
         private System.Windows.Forms.Timer _uiTimer;
         private bool _reallyExit = false;
 
+        // 统一图标来源: 从自身 exe 内嵌资源提取(保持零依赖单文件), 供主窗体/托盘/对话框共用
+        private static Icon _appIconCache = null;
+        internal static Icon AppIcon
+        {
+            get
+            {
+                if (_appIconCache == null)
+                {
+                    try { _appIconCache = Icon.ExtractAssociatedIcon(Application.ExecutablePath); }
+                    catch { _appIconCache = SystemIcons.Application; }
+                }
+                return _appIconCache;
+            }
+        }
+
         public MainForm()
         {
 
@@ -1437,7 +1455,7 @@ namespace ProxyDirector
             Text = "ProxyDirector — 本地多代理自动择优";
             ClientSize = new Size(880, 540);
             StartPosition = FormStartPosition.CenterScreen;
-            Icon = SystemIcons.Application;
+            Icon = AppIcon;
 
             BuildUi();
             BuildTray();
@@ -1564,8 +1582,7 @@ namespace ProxyDirector
         private void BuildTray()
         {
             _tray = new NotifyIcon();
-            try { _tray.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); }
-            catch { _tray.Icon = SystemIcons.Application; }
+            _tray.Icon = AppIcon;
             _tray.Text = "ProxyDirector";
             _tray.Visible = true;
             MenuItem showItem = new MenuItem("显示主窗口", delegate(object s, EventArgs e) { Show(); Activate(); });
