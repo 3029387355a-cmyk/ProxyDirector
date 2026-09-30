@@ -1518,6 +1518,7 @@ namespace ProxyDirector
         private CheckBox _autostartBox;
         private StatusStrip _status;
         private ToolStripStatusLabel _stCurrent, _stNext, _stDecision, _stSys;
+        private int _sortCol = -1;   // 当前列头排序(-1 = 配置顺序)
         private NotifyIcon _tray;
         private System.Windows.Forms.Timer _uiTimer;
         private bool _reallyExit = false;
@@ -1612,6 +1613,13 @@ namespace ProxyDirector
             _lv.SelectedIndexChanged += delegate { RefreshRowBtnStates(); };
             RefreshRowBtnStates();
 
+            // 点击列头排序(固定方向, 规则见 ProxyRowComparer)
+            _lv.ColumnClick += delegate(object s, ColumnClickEventArgs e)
+            {
+                _sortCol = e.Column;
+                OnUiTick(null, EventArgs.Empty);
+            };
+
             MkBtn("设置", 12, 354, OnOpenSettings);
             MkBtn("打开日志", 112, 354, OnOpenLog);
 
@@ -1655,6 +1663,116 @@ namespace ProxyDirector
             if (v < min) return min; if (v > max) return max; return v;
         }
 
+        // ============================ 列表排序 ============================
+        private class ProxyRowComparer : System.Collections.IComparer
+        {
+            private int _col;
+            private string _warmingName;
+            private Dictionary<string, ProxyState> _byName;
+            private Dictionary<string, int> _order;
+
+            public ProxyRowComparer(int col, string warmingName,
+                Dictionary<string, ProxyState> byName, Dictionary<string, int> order)
+            {
+                _col = col; _warmingName = warmingName; _byName = byName; _order = order;
+            }
+
+            public int Compare(object x, object y)
+            {
+                ListViewItem a = (ListViewItem)x, b = (ListViewItem)y;
+                ProxyState sa, sb;
+                if (!_byName.TryGetValue((string)a.Tag, out sa) || !_byName.TryGetValue((string)b.Tag, out sb))
+                    return 0;
+                int r = 0;
+                switch (_col)
+                {
+                    case 0:  // 生效: 主键 是否生效, 次键 延迟升序
+                        r = (sa.cfg.enabled ? 0 : 1).CompareTo(sb.cfg.enabled ? 0 : 1);
+                        if (r == 0) r = LatKey(sa, _warmingName).CompareTo(LatKey(sb, _warmingName));
+                        break;
+                    case 1:  // 名称: 字母顺序
+                        r = string.Compare(sa.cfg.name, sb.cfg.name, StringComparison.CurrentCultureIgnoreCase);
+                        break;
+                    case 2:  // 地址: 数字大小(IP 逐段, 再端口)
+                        r = CmpIp(sa.cfg.host, sb.cfg.host);
+                        if (r == 0) r = sa.cfg.port.CompareTo(sb.cfg.port);
+                        break;
+                    case 3:  // 协议: 字母顺序, 次键 延迟升序
+                        r = string.Compare(sa.cfg.protocol, sb.cfg.protocol, StringComparison.CurrentCultureIgnoreCase);
+                        if (r == 0) r = LatKey(sa, _warmingName).CompareTo(LatKey(sb, _warmingName));
+                        break;
+                    case 4:  // 延迟: 从小到大, 未知垫底
+                        r = LatKey(sa, _warmingName).CompareTo(LatKey(sb, _warmingName));
+                        break;
+                    case 5:  // 状态: 可用→测速中→预热中→已禁用→不可用
+                        r = StateRank(sa, _warmingName).CompareTo(StateRank(sb, _warmingName));
+                        break;
+                    case 6:  // 详情: 字母顺序
+                        r = string.Compare(sa.detail ?? "", sb.detail ?? "", StringComparison.CurrentCultureIgnoreCase);
+                        break;
+                    case 7:  // 进程: 字母顺序
+                        r = string.Compare(sa.cfg.processName ?? "", sb.cfg.processName ?? "", StringComparison.CurrentCultureIgnoreCase);
+                        break;
+                }
+                if (r == 0)
+                {
+                    int ia, ib;
+                    if (!_order.TryGetValue((string)a.Tag, out ia)) ia = int.MaxValue;
+                    if (!_order.TryGetValue((string)b.Tag, out ib)) ib = int.MaxValue;
+                    r = ia - ib;   // 稳定兜底: 回到配置顺序, 避免每秒抖动
+                }
+                return r;
+            }
+        }
+
+        private static int LatKey(ProxyState st, string warmingName)
+        {
+            // 无有效延迟(禁用/预热/未测/失败)统一垫底
+            if (!st.cfg.enabled || st.cfg.name == warmingName || !st.linkOk) return int.MaxValue;
+            return st.latencyMs;
+        }
+
+        private static int StateRank(ProxyState st, string warmingName)
+        {
+            // 与状态列文案逻辑一致: 可用=0 测速中=1 预热中=2 已禁用=3 不可用=4
+            if (!st.cfg.enabled) return 3;
+            if (st.cfg.name == warmingName) return 2;
+            if (st.linkOk) return 0;
+            bool stale = st.detail == "已禁用" || st.detail == "预热中" || st.detail == "测速中";
+            return stale ? 1 : 4;
+        }
+
+        private static int CmpIp(string x, string y)
+        {
+            byte[] ax = TryParseIp(x), ay = TryParseIp(y);
+            if (ax != null && ay != null)
+            {
+                for (int i = 0; i < 4; i++)
+                {
+                    int r = ax[i].CompareTo(ay[i]);
+                    if (r != 0) return r;
+                }
+                return 0;
+            }
+            return string.Compare(x, y, StringComparison.CurrentCultureIgnoreCase);
+        }
+
+        private static byte[] TryParseIp(string s)
+        {
+            if (s == null) return null;
+            string[] parts = s.Split('.');
+            if (parts.Length != 4) return null;
+            byte[] r = new byte[4];
+            for (int i = 0; i < 4; i++)
+            {
+                int v;
+                if (parts[i].Length == 0 || parts[i].Length > 3) return null;
+                if (!int.TryParse(parts[i], out v) || v < 0 || v > 255) return null;
+                r[i] = (byte)v;
+            }
+            return r;
+        }
+
         private void BuildTray()
         {
             _tray = new NotifyIcon();
@@ -1672,14 +1790,19 @@ namespace ProxyDirector
             EngineSnapshot s = _engine.Snapshot;
 
             _lv.BeginUpdate();
-            // 行集合只在代理增删/顺序变化时重建; 每秒仅原地更新单元格, 保留选中/焦点/滚动状态
+            // 行按 Tag(名称)映射填充, 与显示顺序解耦 -> 排序后行序可与配置序不同而不串行
+            Dictionary<string, ProxyState> byName = new Dictionary<string, ProxyState>();
+            Dictionary<string, int> byOrder = new Dictionary<string, int>();
+            for (int i = 0; i < s.states.Count; i++)
+            {
+                if (!byName.ContainsKey(s.states[i].cfg.name)) byName[s.states[i].cfg.name] = s.states[i];
+                byOrder[s.states[i].cfg.name] = i;
+            }
             bool rebuild = _lv.Items.Count != s.states.Count;
             if (!rebuild)
             {
-                for (int i = 0; i < s.states.Count; i++)
-                {
-                    if ((string)_lv.Items[i].Tag != s.states[i].cfg.name) { rebuild = true; break; }
-                }
+                foreach (ListViewItem it in _lv.Items)
+                    if (!byName.ContainsKey((string)it.Tag)) { rebuild = true; break; }
             }
             if (rebuild)
             {
@@ -1693,10 +1816,10 @@ namespace ProxyDirector
                 }
             }
 
-            for (int i = 0; i < s.states.Count; i++)
+            foreach (ListViewItem it in _lv.Items)
             {
-                ListViewItem it = _lv.Items[i];
-                ProxyState st = s.states[i];
+                ProxyState st;
+                if (!byName.TryGetValue((string)it.Tag, out st)) continue;
                 bool isCur = st.cfg.name == s.currentName;
                 bool warming = st.cfg.name == s.warmingName;
                 // 待测状态: 行数据还是禁用/预热/未测的占位, 而开关已启用 -> 显示中性"测速中…"
@@ -1717,6 +1840,10 @@ namespace ProxyDirector
                 it.ForeColor = !st.cfg.enabled ? Color.Gray
                                : (warming || stale ? Color.DarkOrange
                                   : (st.linkOk ? SystemColors.WindowText : Color.Firebrick));
+            }
+            if (_sortCol >= 0)
+            {
+                _lv.ListViewItemSorter = new ProxyRowComparer(_sortCol, s.warmingName, byName, byOrder);
             }
             _lv.EndUpdate();
 
