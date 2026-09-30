@@ -1704,8 +1704,9 @@ namespace ProxyDirector
                     case 4:  // 延迟: 从小到大, 未知垫底
                         r = LatKey(sa, _warmingName).CompareTo(LatKey(sb, _warmingName));
                         break;
-                    case 5:  // 状态: 可用→测速中→预热中→已禁用→不可用
+                    case 5:  // 状态: 可用→测速中→预热中→已禁用→不可用, 次键 延迟升序
                         r = StateRank(sa, _warmingName).CompareTo(StateRank(sb, _warmingName));
+                        if (r == 0) r = LatKey(sa, _warmingName).CompareTo(LatKey(sb, _warmingName));
                         break;
                     case 6:  // 详情: 字母顺序
                         r = string.Compare(sa.detail ?? "", sb.detail ?? "", StringComparison.CurrentCultureIgnoreCase);
