@@ -2,80 +2,49 @@
 <html lang="zh">
 <head>
 <meta charset="utf-8">
-<title>ProxyDirector 图标候选预览(第 2 轮 · 正对跑道构图)</title>
+<title>ProxyDirector 图标 · 暗色雷达 · 加粗版预览</title>
 <style>
   body{font-family:system-ui,"Microsoft YaHei",sans-serif;background:#eef2f7;margin:0;padding:28px;color:#1e293b}
   h1{font-size:20px;margin:0 0 6px}
   p.tip{color:#64748b;font-size:13px;margin:0 0 20px}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px}
+  .row{display:flex;flex-wrap:wrap;gap:20px}
   .card{background:#fff;border-radius:14px;padding:18px;box-shadow:0 2px 10px rgba(15,23,42,.08)}
   .card h2{font-size:15px;margin:0 0 4px}
   .card p{font-size:12.5px;color:#64748b;margin:0 0 12px}
-  img.big{width:260px;height:260px;display:block;margin:0 auto}
-  .row{display:flex;align-items:flex-end;gap:18px;margin-top:12px;justify-content:center}
-  .row figure{margin:0;text-align:center}
-  .row img{display:block;margin:0 auto 4px}
-  .row figcaption{font-size:11px;color:#94a3b8}
+  img.big{width:260px;height:260px;display:block}
+  .ladder{display:flex;align-items:flex-end;gap:16px;margin-top:4px}
+  .ladder figure{margin:0;text-align:center}
+  .ladder img{display:block;margin:0 auto 4px}
+  .ladder figcaption{font-size:11px;color:#94a3b8}
   .dark{background:#0f172a;border-radius:10px;padding:8px;display:inline-block}
 </style>
 </head>
 <body>
-<h1>ProxyDirector 图标候选 · 第 2 轮(正对跑道构图)</h1>
-<p class="tip">镜头正对跑道纵深:双机从同一侧跑道尽头(灭点)离地,一前一后分别向左、右两侧飞离,身后白色线条为运动轨迹。每张下方附 48px / 24px 缩放与深色任务栏模拟。</p>
-<div class="grid">
+<h1>ProxyDirector 图标 · 暗色雷达 · 加粗版(当前已内嵌 exe)</h1>
+<p class="tip">上排为完整版(ICO 的 48/64/128/256 帧由它生成):跑道边线、中线、入口斑马线、航迹全面加粗,飞机放大并加同色描边。下排为小尺寸极简帧(ICO 的 16/24/32 帧专用):去掉雷达环以外的细碎元素,超粗分叉线 + 放大双机,保证缩小后仍可辨认。</p>
+<div class="row">
 
   <div class="card">
-    <h2>候选 1 · 现代扁平(蓝天)</h2>
-    <p>透视跑道 + 白机白航迹,经典应用图标风格,浅色环境最亮眼。</p>
-    <img class="big" src="icon-c1-flat-blue.svg" alt="候选1">
-    <div class="row">
-      <figure><img src="icon-c1-flat-blue.svg" width="48" height="48" alt=""><figcaption>48px</figcaption></figure>
-      <figure><img src="icon-c1-flat-blue.svg" width="24" height="24" alt=""><figcaption>24px</figcaption></figure>
-      <figure><span class="dark"><img src="icon-c1-flat-blue.svg" width="48" height="48" alt=""></span><figcaption>深色任务栏</figcaption></figure>
+    <h2>完整版(icon-c2-radar-dark.svg)</h2>
+    <p>48px 及以上使用</p>
+    <img class="big" src="icon-c2-radar-dark.svg" alt="完整版">
+    <div class="ladder">
+      <figure><img src="icon-c2-radar-dark.svg" width="128" height="128" alt=""><figcaption>128</figcaption></figure>
+      <figure><img src="icon-c2-radar-dark.svg" width="64" height="64" alt=""><figcaption>64</figcaption></figure>
+      <figure><img src="icon-c2-radar-dark.svg" width="48" height="48" alt=""><figcaption>48</figcaption></figure>
+      <figure><span class="dark"><img src="icon-c2-radar-dark.svg" width="48" height="48" alt=""></span><figcaption>深色任务栏 48</figcaption></figure>
     </div>
   </div>
 
   <div class="card">
-    <h2>候选 2 · 暗色雷达(科技)</h2>
-    <p>雷达环以跑道尽头为圆心,扫描扇区 + 青/金双机,白色航迹呈分叉光弧。</p>
-    <img class="big" src="icon-c2-radar-dark.svg" alt="候选2">
-    <div class="row">
-      <figure><img src="icon-c2-radar-dark.svg" width="48" height="48" alt=""><figcaption>48px</figcaption></figure>
-      <figure><img src="icon-c2-radar-dark.svg" width="24" height="24" alt=""><figcaption>24px</figcaption></figure>
-      <figure><span class="dark"><img src="icon-c2-radar-dark.svg" width="48" height="48" alt=""></span><figcaption>深色任务栏</figcaption></figure>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>候选 3 · 暮色剪影</h2>
-    <p>落日正对跑道尽头,双机剪影从夕阳两侧分航,跑道灯向灭点收束。</p>
-    <img class="big" src="icon-c3-sunset.svg" alt="候选3">
-    <div class="row">
-      <figure><img src="icon-c3-sunset.svg" width="48" height="48" alt=""><figcaption>48px</figcaption></figure>
-      <figure><img src="icon-c3-sunset.svg" width="24" height="24" alt=""><figcaption>24px</figcaption></figure>
-      <figure><span class="dark"><img src="icon-c3-sunset.svg" width="48" height="48" alt=""></span><figcaption>深色任务栏</figcaption></figure>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>候选 4 · 蓝图线稿</h2>
-    <p>工程制图风:网格图框、剖面线跑道、灭点十字标与描线飞机。</p>
-    <img class="big" src="icon-c4-blueprint.svg" alt="候选4">
-    <div class="row">
-      <figure><img src="icon-c4-blueprint.svg" width="48" height="48" alt=""><figcaption>48px</figcaption></figure>
-      <figure><img src="icon-c4-blueprint.svg" width="24" height="24" alt=""><figcaption>24px</figcaption></figure>
-      <figure><span class="dark"><img src="icon-c4-blueprint.svg" width="48" height="48" alt=""></span><figcaption>深色任务栏</figcaption></figure>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>候选 5 · 清新卡通</h2>
-    <p>圆润双机(橙/青)从跑道尽头分航,白色点状轨迹,亲和力最强。</p>
-    <img class="big" src="icon-c5-cartoon.svg" alt="候选5">
-    <div class="row">
-      <figure><img src="icon-c5-cartoon.svg" width="48" height="48" alt=""><figcaption>48px</figcaption></figure>
-      <figure><img src="icon-c5-cartoon.svg" width="24" height="24" alt=""><figcaption>24px</figcaption></figure>
-      <figure><span class="dark"><img src="icon-c5-cartoon.svg" width="48" height="48" alt=""></span><figcaption>深色任务栏</figcaption></figure>
+    <h2>小尺寸极简帧(icon-c2-radar-small.svg)</h2>
+    <p>32/24/16 帧使用,托盘与标题栏实际观感</p>
+    <img class="big" src="icon-c2-radar-small.svg" alt="极简版">
+    <div class="ladder">
+      <figure><img src="icon-c2-radar-small.svg" width="32" height="32" alt=""><figcaption>32</figcaption></figure>
+      <figure><img src="icon-c2-radar-small.svg" width="24" height="24" alt=""><figcaption>24</figcaption></figure>
+      <figure><img src="icon-c2-radar-small.svg" width="16" height="16" alt=""><figcaption>16</figcaption></figure>
+      <figure><span class="dark"><img src="icon-c2-radar-small.svg" width="24" height="24" alt=""></span><figcaption>深色托盘 24</figcaption></figure>
     </div>
   </div>
 
