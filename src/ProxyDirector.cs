@@ -42,6 +42,7 @@ namespace ProxyDirector
         public int probeTimeoutMs { get; set; }
         public int speedTimeoutSeconds { get; set; }
         public bool autoSwitch { get; set; }
+        public bool speedWarmMeasure { get; set; }
         public List<string> testUrls { get; set; }
         public List<ProxyEntry> proxies { get; set; }
 
@@ -54,6 +55,7 @@ namespace ProxyDirector
             c.probeTimeoutMs = 800;
             c.speedTimeoutSeconds = 8;
             c.autoSwitch = true;
+            c.speedWarmMeasure = true;
             c.testUrls = new List<string>();
             c.testUrls.Add("https://www.gstatic.com/generate_204");
             c.testUrls.Add("http://www.msftconnecttest.com/connecttest.txt");
@@ -92,6 +94,9 @@ namespace ProxyDirector
                             if (p.testUrlOverride == null) p.testUrlOverride = "";
                             if (legacyEnabled) { p.enabled = true; dirty = true; }
                         }
+                        // 旧配置兼容: 无 speedWarmMeasure 字段时按默认预热方案处理(bool 缺省反序列化为 false)
+                        if (!raw.Contains("\"speedWarmMeasure\""))
+                        { cfg.speedWarmMeasure = true; dirty = true; }
                         if (dirty) Save(cfg);
                         return cfg;
                     }
@@ -303,7 +308,27 @@ namespace ProxyDirector
                 using (HttpClient hc = new HttpClient(h))
                 {
                     hc.Timeout = TimeSpan.FromSeconds(cfg.speedTimeoutSeconds);
-                    hc.DefaultRequestHeaders.ConnectionClose = true;
+                    if (cfg.speedWarmMeasure)
+                    {
+                        // 预热方案: 复用连接, 先发一次不计时请求焐热 本机->核心->节点 链路与 TLS 会话, 再计时第二次。
+                        // 各代理(无论是否正在使用)同温可比, 数值与代理客户端自带测速同口径。
+                        // 预热请求即连通性测试: 超时/失败直接换下一目标, 保证计时请求必走热连接
+                        hc.DefaultRequestHeaders.ConnectionClose = false;
+                        try
+                        {
+                            var warm = hc.GetAsync(url);
+                            if (!warm.Wait(TimeSpan.FromSeconds(cfg.speedTimeoutSeconds))) continue;
+                            using (HttpResponseMessage wr = warm.Result)
+                            {
+                                if (!wr.IsSuccessStatusCode) continue;
+                            }
+                        }
+                        catch { continue; }
+                    }
+                    else
+                    {
+                        hc.DefaultRequestHeaders.ConnectionClose = true;
+                    }
                     Stopwatch sw = Stopwatch.StartNew();
                     try
                     {
@@ -616,13 +641,14 @@ namespace ProxyDirector
             Logger.Log("自动切换: " + (on ? "启用" : "暂停"));
         }
 
-        public void UpdateSettings(int interval, int threshold, int dwell)
+        public void UpdateSettings(int interval, int threshold, int dwell, bool warmMeasure)
         {
             lock (_lock)
             {
                 _cfg.checkIntervalSeconds = interval;
                 _cfg.switchThresholdPercent = threshold;
                 _cfg.minDwellMinutes = dwell;
+                _cfg.speedWarmMeasure = warmMeasure;
             }
             ConfigStore.Save(_cfg);
         }
@@ -1414,6 +1440,67 @@ namespace ProxyDirector
         }
     }
 
+    // ============================ 设置 ============================
+    public class SettingsForm : Form
+    {
+        private ComboBox _schemeBox;
+        private NumericUpDown _intervalNum, _thresholdNum, _dwellNum;
+        public int Interval;
+        public int Threshold;
+        public int Dwell;
+        public bool WarmMeasure;
+
+        public SettingsForm(int interval, int threshold, int dwell, bool warm)
+        {
+            Text = "设置";
+            Icon = MainForm.AppIcon;
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+            MaximizeBox = false; MinimizeBox = false;
+            StartPosition = FormStartPosition.CenterParent;
+            ClientSize = new Size(380, 216);
+
+            Label l0 = new Label(); l0.Text = "测速方案:"; l0.AutoSize = true; l0.Location = new Point(12, 15); Controls.Add(l0);
+            _schemeBox = new ComboBox(); _schemeBox.DropDownStyle = ComboBoxStyle.DropDownList;
+            _schemeBox.Items.Add("预热测速 (默认, 推荐)");
+            _schemeBox.Items.Add("冷连接测速 (省流量)");
+            _schemeBox.SelectedIndex = warm ? 0 : 1;
+            _schemeBox.Location = new Point(90, 12); _schemeBox.Width = 276; Controls.Add(_schemeBox);
+
+            Label hint = new Label();
+            hint.Text = "预热测速: 先发一次不计时的预热请求焐热链路, 再对第二次请求计时; 各代理同温可比, 数值与代理客户端自带测速同口径。\n冷连接测速: 每次全新连接单次计时(旧版行为), 省流量, 但正在使用的代理偏快、备用的偏冷, 比较有偏差。";
+            hint.ForeColor = Color.DimGray;
+            hint.Location = new Point(12, 40); hint.Width = 356; hint.Height = 44; Controls.Add(hint);
+
+            Label l1 = new Label(); l1.Text = "周期(秒)"; l1.AutoSize = true; l1.Location = new Point(12, 100); Controls.Add(l1);
+            _intervalNum = new NumericUpDown(); _intervalNum.Location = new Point(90, 96); _intervalNum.Width = 70;
+            _intervalNum.Minimum = 15; _intervalNum.Maximum = 3600; _intervalNum.Value = interval; Controls.Add(_intervalNum);
+
+            Label l2 = new Label(); l2.Text = "阈值(%)"; l2.AutoSize = true; l2.Location = new Point(180, 100); Controls.Add(l2);
+            _thresholdNum = new NumericUpDown(); _thresholdNum.Location = new Point(240, 96); _thresholdNum.Width = 60;
+            _thresholdNum.Minimum = 5; _thresholdNum.Maximum = 90; _thresholdNum.Value = threshold; Controls.Add(_thresholdNum);
+
+            Label l3 = new Label(); l3.Text = "停留(分)"; l3.AutoSize = true; l3.Location = new Point(12, 138); Controls.Add(l3);
+            _dwellNum = new NumericUpDown(); _dwellNum.Location = new Point(90, 134); _dwellNum.Width = 70;
+            _dwellNum.Minimum = 1; _dwellNum.Maximum = 120; _dwellNum.Value = dwell; Controls.Add(_dwellNum);
+
+            Button ok = new Button(); ok.Text = "保存"; ok.Location = new Point(170, 174); ok.Width = 90;
+            ok.Click += OnOk; Controls.Add(ok);
+            Button cancel = new Button(); cancel.Text = "取消"; cancel.DialogResult = DialogResult.Cancel;
+            cancel.Location = new Point(272, 174); cancel.Width = 90; Controls.Add(cancel);
+            AcceptButton = ok; CancelButton = cancel;
+        }
+
+        private void OnOk(object sender, EventArgs e)
+        {
+            Interval = (int)_intervalNum.Value;
+            Threshold = (int)_thresholdNum.Value;
+            Dwell = (int)_dwellNum.Value;
+            WarmMeasure = _schemeBox.SelectedIndex == 0;
+            DialogResult = DialogResult.OK;
+            Close();
+        }
+    }
+
     // ============================ 主窗体 ============================
     public class MainForm : Form
     {
@@ -1421,9 +1508,7 @@ namespace ProxyDirector
         private AppConfig _cfg;
         private ListView _lv;
         private Button _addBtn, _delBtn, _rescanBtn, _testBtn, _pauseBtn, _switchBtn, _toggleBtn;
-        private NumericUpDown _intervalNum, _thresholdNum, _dwellNum;
         private CheckBox _autostartBox;
-        private Button _saveBtn;
         private StatusStrip _status;
         private ToolStripStatusLabel _stCurrent, _stNext, _stDecision, _stSys;
         private NotifyIcon _tray;
@@ -1520,20 +1605,8 @@ namespace ProxyDirector
             _lv.SelectedIndexChanged += delegate { RefreshRowBtnStates(); };
             RefreshRowBtnStates();
 
-            Label s1 = new Label(); s1.Text = "周期(秒)"; s1.AutoSize = true; s1.Location = new Point(12, 360); Controls.Add(s1);
-            _intervalNum = new NumericUpDown(); _intervalNum.Location = new Point(80, 356); _intervalNum.Width = 70;
-            _intervalNum.Minimum = 15; _intervalNum.Maximum = 3600; Controls.Add(_intervalNum);
-
-            Label s2 = new Label(); s2.Text = "阈值(%)"; s2.AutoSize = true; s2.Location = new Point(170, 360); Controls.Add(s2);
-            _thresholdNum = new NumericUpDown(); _thresholdNum.Location = new Point(230, 356); _thresholdNum.Width = 60;
-            _thresholdNum.Minimum = 5; _thresholdNum.Maximum = 90; Controls.Add(_thresholdNum);
-
-            Label s3 = new Label(); s3.Text = "停留(分)"; s3.AutoSize = true; s3.Location = new Point(310, 360); Controls.Add(s3);
-            _dwellNum = new NumericUpDown(); _dwellNum.Location = new Point(375, 356); _dwellNum.Width = 60;
-            _dwellNum.Minimum = 1; _dwellNum.Maximum = 120; Controls.Add(_dwellNum);
-
-            _saveBtn = MkBtn("保存设置", 460, 354, OnSaveSettings);
-            MkBtn("打开日志", 560, 354, OnOpenLog);
+            MkBtn("设置", 12, 354, OnOpenSettings);
+            MkBtn("打开日志", 112, 354, OnOpenLog);
 
             // 开机自启开关 (注册表 Run 项为唯一事实来源, 启动时读实际状态)
             _autostartBox = new CheckBox();
@@ -1558,10 +1631,6 @@ namespace ProxyDirector
             _status.Items.Add(_stDecision); _status.Items.Add(_stSys);
             Controls.Add(_status);
 
-            // 初始填充设置
-            _intervalNum.Value = ClampNum(_cfg.checkIntervalSeconds, 15, 3600);
-            _thresholdNum.Value = ClampNum(_cfg.switchThresholdPercent, 5, 90);
-            _dwellNum.Value = ClampNum(_cfg.minDwellMinutes, 1, 120);
             _pauseBtn.Text = _cfg.autoSwitch ? "暂停自动切换" : "恢复自动切换";
         }
 
@@ -1847,12 +1916,20 @@ namespace ProxyDirector
             _engine.SetAutoSwitch(!s.autoSwitch);
         }
 
-        private void OnSaveSettings(object sender, EventArgs e)
+        private void OnOpenSettings(object sender, EventArgs e)
         {
-            _engine.UpdateSettings((int)_intervalNum.Value, (int)_thresholdNum.Value, (int)_dwellNum.Value);
-            Logger.Log("用户保存设置: 周期=" + (int)_intervalNum.Value + "s 阈值="
-                       + (int)_thresholdNum.Value + "% 停留=" + (int)_dwellNum.Value + "分");
-            MessageBox.Show("设置已保存");
+            using (SettingsForm f = new SettingsForm(
+                (int)ClampNum(_cfg.checkIntervalSeconds, 15, 3600),
+                (int)ClampNum(_cfg.switchThresholdPercent, 5, 90),
+                (int)ClampNum(_cfg.minDwellMinutes, 1, 120),
+                _cfg.speedWarmMeasure))
+            {
+                if (f.ShowDialog(this) != DialogResult.OK) return;
+                _engine.UpdateSettings(f.Interval, f.Threshold, f.Dwell, f.WarmMeasure);
+                Logger.Log("用户保存设置: 周期=" + f.Interval + "s 阈值=" + f.Threshold + "% 停留=" + f.Dwell
+                           + "分 测速方案=" + (f.WarmMeasure ? "预热" : "冷连接"));
+                MessageBox.Show("设置已保存");
+            }
         }
 
         private void OnOpenLog(object sender, EventArgs e)
