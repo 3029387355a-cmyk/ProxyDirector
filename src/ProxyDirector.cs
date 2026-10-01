@@ -363,7 +363,33 @@ namespace ProxyDirector
         private const int INTERNET_OPTION_SETTINGS_CHANGED = 39;
         private const int INTERNET_OPTION_REFRESH = 37;
 
-        private static RegistryKey OpenKey() { return Registry.CurrentUser.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings", true); }
+        private const string ISE_KEY = "Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings";
+
+        // 注册表键可能被清理类工具整个删除: 打开失败时重建, 保证读写不再落空
+        private static RegistryKey OpenKey()
+        {
+            RegistryKey k = Registry.CurrentUser.OpenSubKey(ISE_KEY, true);
+            if (k == null) k = Registry.CurrentUser.CreateSubKey(ISE_KEY);
+            return k;
+        }
+
+        // 检查系统代理注册表键是否存在, 缺失则按默认值重建; 返回 true 表示发生了重建
+        public static bool EnsureKeyExists()
+        {
+            using (RegistryKey probe = Registry.CurrentUser.OpenSubKey(ISE_KEY, false))
+            {
+                if (probe != null) return false;
+            }
+            using (RegistryKey k = Registry.CurrentUser.CreateSubKey(ISE_KEY))
+            {
+                if (k != null)
+                {
+                    k.SetValue("ProxyEnable", 0, RegistryValueKind.DWord);
+                    k.SetValue("ProxyHttp1.1", 1, RegistryValueKind.DWord);
+                }
+            }
+            return true;
+        }
 
         public static string GetCurrent()
         {
@@ -771,6 +797,29 @@ namespace ProxyDirector
             }
             MarkActive(name);
             Logger.Log("手动切换 -> " + name + " (" + target.host + ":" + target.port + ")");
+        }
+
+        // 一键自愈: 注册表键缺失时重建, 并把指定代理设为系统代理(状态对齐 + 日志)
+        public bool ResetSystemProxy(string name)
+        {
+            ProxyEntry target = null;
+            foreach (ProxyEntry p in _cfg.proxies) if (p.name == name) { target = p; break; }
+            if (target == null) return false;
+            bool rebuilt = SystemProxy.EnsureKeyExists();
+            SettleActive();
+            SystemProxy.Set(target.host + ":" + target.port.ToString());
+            lock (_lock)
+            {
+                _currentName = name;
+                _lastSwitch = DateTime.Now;
+                _snap.currentName = name;
+                _snap.lastSwitchInfo = DateTime.Now.ToString("HH:mm:ss") + " 重置 -> " + name;
+                _snap.sysProxy = SystemProxy.GetCurrent();
+            }
+            MarkActive(name);
+            Logger.Log("重置系统代理 -> " + name + " (" + target.host + ":" + target.port + ")"
+                       + (rebuilt ? " | 注册表键缺失, 已重建" : "") + " | 系统代理: " + SystemProxy.GetCurrent());
+            return true;
         }
 
         private void RunLoop()
@@ -1640,8 +1689,10 @@ namespace ProxyDirector
 
             Button settingsBtn = MkBtn("设置", 12, 354, OnOpenSettings);
             Button logBtn = MkBtn("打开日志", 112, 354, OnOpenLog);
+            Button resetBtn = MkBtn("重置系统代理", 212, 354, OnResetProxy);
             settingsBtn.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
             logBtn.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+            resetBtn.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
 
             // 开机自启开关 (注册表 Run 项为唯一事实来源, 启动时读实际状态)
             _autostartBox = new CheckBox();
@@ -2102,6 +2153,23 @@ namespace ProxyDirector
                            + "分 测速方案=" + (f.WarmMeasure ? "预热(等待" + f.WarmWaitSeconds + "s)" : "冷连接"));
                 MessageBox.Show("设置已保存");
             }
+        }
+
+        // 一键自愈: 注册表键缺失则重建, 并把当前最优代理设为系统代理
+        private void OnResetProxy(object sender, EventArgs e)
+        {
+            EngineSnapshot s = _engine.Snapshot;
+            ProxyState best = null;
+            foreach (ProxyState st in s.states)
+                if (st.cfg.enabled && st.linkOk && (best == null || st.latencyMs < best.latencyMs)) best = st;
+            if (best == null)
+            {
+                MessageBox.Show("当前没有可用代理, 无法重置系统代理");
+                return;
+            }
+            bool rebuilt = _engine.ResetSystemProxy(best.cfg.name);
+            MessageBox.Show("系统代理已重置为 " + best.cfg.name + " (" + best.cfg.host + ":" + best.cfg.port + ")"
+                            + (rebuilt ? "\n检测到系统代理注册表键缺失, 已自动重建" : ""));
         }
 
         private void OnOpenLog(object sender, EventArgs e)
