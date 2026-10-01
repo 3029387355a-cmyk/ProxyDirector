@@ -800,12 +800,14 @@ namespace ProxyDirector
         }
 
         // 一键自愈: 注册表键缺失时重建, 并把指定代理设为系统代理(状态对齐 + 日志)
-        public bool ResetSystemProxy(string name)
+        // 返回值 = 是否成功重置; keyRebuilt = 注册表键是否发生了重建(供 UI 提示)
+        public bool ResetSystemProxy(string name, out bool keyRebuilt)
         {
+            keyRebuilt = false;
             ProxyEntry target = null;
             foreach (ProxyEntry p in _cfg.proxies) if (p.name == name) { target = p; break; }
             if (target == null) return false;
-            bool rebuilt = SystemProxy.EnsureKeyExists();
+            keyRebuilt = SystemProxy.EnsureKeyExists();
             SettleActive();
             SystemProxy.Set(target.host + ":" + target.port.ToString());
             lock (_lock)
@@ -818,7 +820,7 @@ namespace ProxyDirector
             }
             MarkActive(name);
             Logger.Log("重置系统代理 -> " + name + " (" + target.host + ":" + target.port + ")"
-                       + (rebuilt ? " | 注册表键缺失, 已重建" : "") + " | 系统代理: " + SystemProxy.GetCurrent());
+                       + (keyRebuilt ? " | 注册表键缺失, 已重建" : "") + " | 系统代理: " + SystemProxy.GetCurrent());
             return true;
         }
 
@@ -2167,7 +2169,12 @@ namespace ProxyDirector
                 MessageBox.Show("当前没有可用代理, 无法重置系统代理");
                 return;
             }
-            bool rebuilt = _engine.ResetSystemProxy(best.cfg.name);
+            bool rebuilt;
+            if (!_engine.ResetSystemProxy(best.cfg.name, out rebuilt))
+            {
+                MessageBox.Show("重置失败: 未找到代理 " + best.cfg.name);
+                return;
+            }
             MessageBox.Show("系统代理已重置为 " + best.cfg.name + " (" + best.cfg.host + ":" + best.cfg.port + ")"
                             + (rebuilt ? "\n检测到系统代理注册表键缺失, 已自动重建" : ""));
         }
